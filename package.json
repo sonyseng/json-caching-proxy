@@ -1,10 +1,12 @@
 {
   "name": "json-caching-proxy",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "scripts": {
-    "start": "node ./bin.js",
-    "test": "node node_modules/mocha/bin/mocha ./*.spec.js",
-    "test-debug": "node-debug --web-host 192.168.56.103 node_modules/mocha/bin/_mocha ./*.spec.js"
+    "test": "node node_modules/mocha/bin/mocha ./*.spec.js"
+  },
+  "repository": {
+    "type" : "git",
+    "url" : "https://github.com/sonyseng/json-caching-proxy.git"
   },
   "author": "Sony Seng",
   "license": "MIT",
