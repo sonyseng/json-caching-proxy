@@ -82,4 +82,4 @@ let proxy = jsonCachingProxy({remoteServerUrl, middlewareList});
 
 ## License
 
-MIT © [Sindre Sorhus](https://sindresorhus.com)
+MIT
