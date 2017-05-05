@@ -15,7 +15,7 @@ Programatically: ``` $ npm install -D json-caching-proxy ```
 
 ## Command line usage
 
-```js
+```
 
 json-caching-proxy [options]
 
@@ -50,7 +50,7 @@ json-caching-proxy -u restful-api-server:8080 -d cache -p 8000
 
 ```js
 
-const jsonCachingProxy = require('./');
+const jsonCachingProxy = require('json-caching-proxy');
 
 let remoteServerUrl = 'api-server:8000';
 let proxyPort = 3000;
