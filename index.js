@@ -109,7 +109,7 @@ function jsonCachingProxy (options, isDebugging) {
     let resource = req.path;
 
     if (!dataOverwrite && dataPlayback) {
-      let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `key/${req.query[key]}`).join('/');
+      let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `${key}/${req.query[key]}`).join('/');
       let directory = path.join(currentWorkingDir, cacheDataDirectory, resource, queryParamPath);
 
       // Read from a file if it exists
@@ -140,7 +140,7 @@ function jsonCachingProxy (options, isDebugging) {
         if (contentType && contentType.indexOf('application/json') >= 0) {
           let resource = req.path;
           let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `${key}/${req.query[key]}`).join('/');
-          let directory = path.join(process.cwd(), cacheDataDirectory, resource, queryParamPath);
+          let directory = path.join(currentWorkingDir, cacheDataDirectory, resource, queryParamPath);
 
           if (dataOverwrite) {
             // Always create data even if the file exists
