@@ -8,7 +8,7 @@ const defaultPort = 3001;
 const defaultCacheDir = 'cache';
 
 program
-  .version('1.0.3')
+  .version('1.0.4')
   .option('-u, --url <url>', 'Remote server to proxy (e.g. https://network:8080)')
   .option('-p, --port [n]', 'Port for the local proxy server (Default: '+ defaultPort +')', parseInt)
   .option('-d, --dir [path]', 'Local Directory to store JSON responses (Default: "'+ defaultCacheDir +'")')

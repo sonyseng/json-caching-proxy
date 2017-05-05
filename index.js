@@ -26,7 +26,7 @@ function jsonCachingProxy (options, isDebugging) {
   } = options;
 
   let app = express();
-
+  let currentWorkingDir = process.cwd();
   let server, printLog, printError;
 
   if (isDebugging) {
@@ -111,7 +111,7 @@ function jsonCachingProxy (options, isDebugging) {
 
     if (!dataOverwrite && dataPlayback && contentType && contentType.indexOf('application/json') >= 0) {
       let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `key/${req.query[key]}`).join('/');
-      let directory = path.join(__dirname, cacheDataDirectory, resource, queryParamPath);
+      let directory = path.join(currentWorkingDir, cacheDataDirectory, resource, queryParamPath);
 
       // Read from a file if it exists
       fs.stat(directory, function (err) {
@@ -141,7 +141,7 @@ function jsonCachingProxy (options, isDebugging) {
         if (contentType && contentType.indexOf('application/json') >= 0) {
           let resource = req.path;
           let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `key/${req.query[key]}`).join('/');
-          let directory = path.join(__dirname, cacheDataDirectory, resource, queryParamPath);
+          let directory = path.join(process.cwd(), cacheDataDirectory, resource, queryParamPath);
 
           if (dataOverwrite) {
             // Always create data even if the file exists
@@ -174,7 +174,7 @@ function jsonCachingProxy (options, isDebugging) {
       printLog(chalk.gray(`======================\n`));
       printLog(`Remote Server URL: ${chalk.bold(remoteServerUrl)}`);
       printLog(`Proxy running on port: ${chalk.bold(proxyPort)}`);
-      printLog(`Persisting JSON to: ${chalk.bold(cacheDataDirectory)}`);
+      printLog(`Persisting JSON to: ${chalk.bold(path.join(currentWorkingDir, cacheDataDirectory))}`);
       printLog(`Cached Playback: ${chalk.bold(dataPlayback)}`);
       printLog(`Cache persistence: ${chalk.bold(dataRecord)}`);
       printLog(`Always Overwrite cache: ${chalk.bold(dataOverwrite)}`);
