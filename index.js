@@ -106,10 +106,9 @@ function jsonCachingProxy (options, isDebugging) {
   }
 
   app.use('/', function (req, res, next) {
-    let contentType = req.headers['accept'];
     let resource = req.path;
 
-    if (!dataOverwrite && dataPlayback && contentType && contentType.indexOf('application/json') >= 0) {
+    if (!dataOverwrite && dataPlayback) {
       let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `key/${req.query[key]}`).join('/');
       let directory = path.join(currentWorkingDir, cacheDataDirectory, resource, queryParamPath);
 
@@ -127,7 +126,7 @@ function jsonCachingProxy (options, isDebugging) {
         }
       });
     } else {
-      printLog(chalk.gray('Proxied Resource', req.path));
+      printLog(chalk.gray('_Proxied Resource', req.path));
       next();
     }
   });
@@ -140,7 +139,7 @@ function jsonCachingProxy (options, isDebugging) {
 
         if (contentType && contentType.indexOf('application/json') >= 0) {
           let resource = req.path;
-          let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `key/${req.query[key]}`).join('/');
+          let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `${key}/${req.query[key]}`).join('/');
           let directory = path.join(process.cwd(), cacheDataDirectory, resource, queryParamPath);
 
           if (dataOverwrite) {
