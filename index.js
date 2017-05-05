@@ -88,7 +88,7 @@ function jsonCachingProxy (options, isDebugging) {
   });
 
   app.use(`/${commandPrefix}/clear`, function (req, res) {
-    rimraf(path.join(__dirname, cacheDataDirectory), function () {
+    rimraf(path.join(currentWorkingDir, cacheDataDirectory), function () {
       printLog(chalk.blue('Cleared cache'));
       res.send('Cleared cache');
     });
