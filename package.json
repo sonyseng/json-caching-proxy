@@ -1,6 +1,6 @@
 {
   "name": "json-caching-proxy",
-  "version": "1.0.4",
+  "version": "1.0.5",
   "scripts": {
     "test": "node node_modules/mocha/bin/mocha ./*.spec.js"
   },
