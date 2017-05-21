@@ -3,8 +3,8 @@ const rimraf = require('rimraf');
 const path = require('path');
 const mkdirp = require('mkdirp');
 const express = require('express');
-const bodyParser = require('body-parser');
 const proxy = require('express-http-proxy');
+const bodyParser = require('body-parser');
 const request = require('request');
 const urlUtil = require('url');
 const chalk = require('chalk');
@@ -41,6 +41,10 @@ function jsonCachingProxy (options, isOutputVisible) {
 		printError = () => false;
 	}
 
+	function convertToNameValueList (obj) {
+		return typeof obj === 'object' ? Object.keys(obj).map(key => { return { name: key, value: obj[key] }; }) : [];
+	}
+
 	function genKeyFromHarReq (harEntryReq, cacheBustingParam) {
 		let { method, url, queryString=[], postData={} } = harEntryReq;
 		let uri = urlUtil.parse(url).pathname;
@@ -53,15 +57,13 @@ function jsonCachingProxy (options, isOutputVisible) {
 	}
 
 	function genKeyFromExpressReq (req, cacheBustingParam) {
-		let queryString = Object.keys(req.query).map(key => {
-			return { name: key, value: req.query[key] }
-		});
+		let queryString = convertToNameValueList(req.query);
 
 		return genKeyFromHarReq({
 			method: req.method,
 			url: req.url,
 			queryString: queryString,
-			postData: { text: req.body && req.body.length > 0 ? req.body : '' }
+			postData: { text: req.body && req.body.length > 0 ? req.body.toString('utf8') : '' }
 		}, cacheBustingParam);
 	}
 
@@ -70,7 +72,6 @@ function jsonCachingProxy (options, isOutputVisible) {
 		let reqMimeType = req.get('Content-Type');
 		let resMimeType = res.get('Content-Type') || 'text/plain';
 		let encoding = (/^text\/|^application\/(javascript|json)/).test(resMimeType) ? 'utf8' : 'base64';
-		let convertToNameValueList = (obj) => typeof obj === 'object' ? Object.keys(obj).map(key => { return { name: key, value: obj[key] }; }) : [];
 
 		let entry = {
 			request: {
@@ -87,7 +88,7 @@ function jsonCachingProxy (options, isOutputVisible) {
 				status: res.statusCode,
 				statusText: res.statusMessage,
 				cookies: convertToNameValueList(res.cookies),
-				headers: convertToNameValueList(res._headers),
+				headers: convertToNameValueList(res._headers).filter(header => header.name.toLowerCase() !== 'content-encoding'), // Not  compressed
 				content: {
 					size: -1,
 					mimeType: resMimeType,
@@ -102,12 +103,13 @@ function jsonCachingProxy (options, isOutputVisible) {
 		if (req.body && req.body.length > 0) {
 			entry.request.postData = {
 				mimeType: reqMimeType,
-				text: req.body
+				text: req.body.toString(encoding)
 			}
 		}
 
 		return entry;
 	}
+
 	//
 	//function persistResponseData (directory, fileName, responseStr) {
 	//	let responseFilePath = path.join(directory, fileName);
@@ -161,10 +163,6 @@ function jsonCachingProxy (options, isOutputVisible) {
 		//rimraf(path.join(currentWorkingDir, cacheDataDirectory), function () {});
 	});
 
-	//app.use(bodyParser.json());
-	//app.use(bodyParser.urlencoded({ extended: true }));
-	app.use(bodyParser.text({ type: '*/*' }));
-
 	// User supplied middleware to handle special cases (browser-sync middleware options)
 	if (middlewareList && middlewareList.length > 0) {
 		middlewareList.forEach((mw) => {
@@ -175,6 +173,8 @@ function jsonCachingProxy (options, isOutputVisible) {
 			}
 		});
 	}
+
+	app.use(bodyParser.raw({ type: '*/*' }));
 
 	// TODO: Load har {harFilePath} JSON into the har object
 	//let har = {};
@@ -188,7 +188,7 @@ function jsonCachingProxy (options, isOutputVisible) {
 			let key = genKeyFromExpressReq(req, cacheBustingParam);
 			let entry = routeCache[key];
 
-			if (entry && entry.response && entry.response.content && entry.response.content.text) {
+			if (entry && entry.response && entry.response.content) {
 				let response = entry.response;
 				let headerList = response.headers || [];
 
@@ -196,21 +196,22 @@ function jsonCachingProxy (options, isOutputVisible) {
 					res.set(header.name, header.value);
 				});
 
-				if (response.content.encoding === 'base64') {
-					let bin = new Buffer(response.content.text, 'base64');
-
-					// TODO: Handle redirects properly
-					res.writeHead(response.status, {
-						'Content-Type': response.content.mimeType,
-						'Content-Length': bin.length
-					});
-
-					res.end(bin);
+				// TODO: Handle redirects properly
+				if (response.content.text.length === 0) {
+					res.sendStatus(response.status);
 				} else {
-					// TODO: Handle redirects properly
-					res.status(response.status);
-					res.type(response.content.mimeType);
-					res.send(response.content.text);
+					if (response.content.encoding === 'base64') {
+						let bin = new Buffer(response.content.text, 'base64');
+						res.writeHead(response.status, {
+							'Content-Type': response.content.mimeType,
+							'Content-Length': bin.length
+						});
+						res.end(bin);
+					} else {
+						res.status(response.status);
+						res.type(response.content.mimeType);
+						res.send(response.content.text);
+					}
 				}
 
 				printLog(chalk.green('Reading From Cache', chalk.bold(entry.request.url)));
@@ -226,6 +227,12 @@ function jsonCachingProxy (options, isOutputVisible) {
 
 	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
 	app.use('/', proxy(remoteServerUrl, {
+		parseReqBody: false,
+
+		proxyReqBodyDecorator: function(postData, req) {
+			return postData;
+		},
+
 		userResDecorator: function (rsp, rspData, req, res) {
 			if (dataRecord) {
 				// TODO: pass cache busting argument to ignore in this method
