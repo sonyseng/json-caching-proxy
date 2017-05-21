@@ -11,17 +11,17 @@ const chalk = require('chalk');
 
 // TODO: Write HAR File
 
-function jsonCachingProxy (options, isOutputVisible) {
+function harCachingProxy (options, isOutputVisible) {
 	let {
 		// Get all the options passed to the function
 		remoteServerUrl,
+		inputHarFile,
+		outputHarFile,
 		proxyPort,
-		cacheDataDirectory,
 		middlewareList,
 		commandPrefix='proxy',
-		proxyHeaderIdentifier = 'json-cached-proxy-playback',
-		harFilePath,
-		cacheBustingParam,
+		proxyHeaderIdentifier = 'cached-proxy-playback',
+		cacheBustingParam, // TODO: Handle multiple ways of cache busting. Multi params, headers, etc.
 
 		dataPlayback = true,
 		dataRecord = true
@@ -63,7 +63,9 @@ function jsonCachingProxy (options, isOutputVisible) {
 			method: req.method,
 			url: req.url,
 			queryString: queryString,
-			postData: { text: req.body && req.body.length > 0 ? req.body.toString('utf8') : '' }
+
+			// TODO: Use MD5 Hash?
+			postData: { text: req.postData && req.postData.length > 0 ? req.postData.toString('utf8') : '' }
 		}, cacheBustingParam);
 	}
 
@@ -100,10 +102,10 @@ function jsonCachingProxy (options, isOutputVisible) {
 			}
 		};
 
-		if (req.body && req.body.length > 0) {
+		if (req.postData && req.postData.length > 0) {
 			entry.request.postData = {
 				mimeType: reqMimeType,
-				text: req.body.toString(encoding)
+				text: req.postData.toString(encoding)
 			}
 		}
 
@@ -174,13 +176,50 @@ function jsonCachingProxy (options, isOutputVisible) {
 		});
 	}
 
-	app.use(bodyParser.raw({ type: '*/*' }));
+	if (inputHarFile) {
+		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
+		harObject.log.entries.forEach(function (entry) {
+			let key = genKeyFromHarReq(entry.request, cacheBustingParam);
+			routeCache[key] = entry;
+			console.log(key);
+		});
+	}
 
-	// TODO: Load har {harFilePath} JSON into the har object
-	//let har = {};
-	//har.log.entries.forEach(function (entry) {
-	//	cache[genKeyFromHarReq(entry.request, cacheBustingParam)] = entry;
-	//});
+	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
+	app.use('/', proxy(remoteServerUrl, {
+		//parseReqBody: false,
+
+		proxyReqBodyDecorator: function(postData, req) {
+			req.postData = postData;
+			return postData;
+		},
+
+		filter: function(req) {
+			let key = genKeyFromExpressReq(req, cacheBustingParam);
+			let isCached = !!routeCache[key];
+			return !isCached;
+		},
+
+		userResDecorator: function (rsp, rspData, req, res) {
+			if (dataRecord) {
+				let location = res.get('location');
+				if (location) {
+					// Handle Redirects
+					res.location(urlUtil.parse(location).path);
+				}
+
+				let key = genKeyFromExpressReq(req, cacheBustingParam);
+				let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
+
+				routeCache[key] = entry;
+				printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+			}
+
+			return rspData;
+		}
+	}));
+
+	app.use(bodyParser.raw({ type: '*/*' }));
 
 	// Read from the cache if possible for any routes not being handled by previous middleware
 	app.use('/', function readFromRouteCache (req, res, next) {
@@ -216,43 +255,13 @@ function jsonCachingProxy (options, isOutputVisible) {
 
 				printLog(chalk.green('Reading From Cache', chalk.bold(entry.request.url)));
 			} else {
-				printLog(chalk.gray('Proxied Resource', req.path));
 				next();
 			}
 		} else {
-			printLog(chalk.gray('Cache Disabled - Proxied Resource', req.path));
 			next();
 		}
 	});
 
-	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
-	app.use('/', proxy(remoteServerUrl, {
-		parseReqBody: false,
-
-		proxyReqBodyDecorator: function(postData, req) {
-			return postData;
-		},
-
-		userResDecorator: function (rsp, rspData, req, res) {
-			if (dataRecord) {
-				// TODO: pass cache busting argument to ignore in this method
-
-				// Handle Redirects
-				let location = res.get('location');
-				if (location) {
-					res.location(urlUtil.parse(location).path);
-				}
-
-				let key = genKeyFromExpressReq(req, cacheBustingParam);
-				let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
-
-				routeCache[key] = entry;
-				printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
-			}
-
-			return rspData;
-		}
-	}));
 
 	return {
 		start: function () {
@@ -261,7 +270,10 @@ function jsonCachingProxy (options, isOutputVisible) {
 			printLog(chalk.gray(`======================\n`));
 			printLog(`Remote Server URL: ${chalk.bold(remoteServerUrl)}`);
 			printLog(`Proxy running on port: ${chalk.bold(proxyPort)}`);
-			printLog(`Persisting JSON to: ${chalk.bold(path.join(currentWorkingDir, cacheDataDirectory))}`);
+
+			inputHarFile && printLog(`HAR Input File: ${chalk.bold(path.join(currentWorkingDir, inputHarFile))}`);
+			outputHarFile && printLog(`HAR Output File: ${chalk.bold(path.join(currentWorkingDir, outputHarFile))}`);
+
 			printLog(`Cached Playback: ${chalk.bold(dataPlayback)}`);
 			printLog(`Cache persistence: ${chalk.bold(dataRecord)}`);
 			printLog(`Command Prefix: ${chalk.bold(commandPrefix)}`);
@@ -294,7 +306,7 @@ function jsonCachingProxy (options, isOutputVisible) {
 	}
 }
 
-module.exports = jsonCachingProxy;
+module.exports = harCachingProxy;
 
 
 

@@ -1,12 +1,12 @@
 {
-  "name": "json-caching-proxy",
-  "version": "1.0.8",
+  "name": "har-caching-proxy",
+  "version": "0.0.1",
   "scripts": {
     "test": "node node_modules/mocha/bin/mocha ./*.spec.js"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sonyseng/json-caching-proxy.git"
+    "url": "https://github.com/sonyseng/har-caching-proxy.git"
   },
   "author": "Sony Seng",
   "license": "MIT",

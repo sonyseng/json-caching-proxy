@@ -1,15 +1,16 @@
-const jsonCachingProxy = require('./');
+const version = require('./package.json').version;
+const harCachingProxy = require('./');
 const program = require('commander');
 const url = require('url');
 
 const defaultPort = 3001;
-const defaultCacheDir = 'cache';
 
 program
-	.version('1.0.8')
+	.version(version)
 	.option('-u, --url <url>', 'Remote server to proxy (e.g. https://network:8080)')
 	.option('-p, --port [n]', 'Port for the local proxy server (Default: ' + defaultPort + ')', parseInt)
-	.option('-d, --dir [path]', 'Local Directory to store JSON responses (Default: "' + defaultCacheDir + '")')
+	.option('-i, --inputfile [path]', 'Load an existing HAR file and hydrate the cache')
+	.option('-o, --outputfile [path]', 'Output all cached routes to a new HAR file')
 	.parse(process.argv);
 
 if (!program.url) {
@@ -17,13 +18,15 @@ if (!program.url) {
 } else {
 	let remoteServerUrl = program.url;
 	let proxyPort = program.port || defaultPort;
-	let cacheDataDirectory = program.dir || defaultCacheDir; // Directory relative to this file
-	let cacheBustingParam = '_';
+	let inputHarFile = program.inputfile;
+	let outputHarFile = program.outputfile; // TODO
+	let cacheBustingParam = '_'; // TODO: Make this a list passed arg
 
-	jsonCachingProxy({
+	harCachingProxy({
 		remoteServerUrl,
+		inputHarFile,
+		outputHarFile,
 		proxyPort,
-		cacheDataDirectory,
 		cacheBustingParam
 	}, true).start();
 }
