@@ -46,9 +46,9 @@ function harCachingProxy (options, isOutputVisible) {
 	}
 
 	function genKeyFromHarReq (harEntryReq, cacheBustingParam) {
-		let { method, url, queryString=[], postData={} } = harEntryReq;
+		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
 		let uri = urlUtil.parse(url).pathname;
-		let postParams = postData.text;
+		let postParams = postData.text; // TODO: Use MD5 Hash?
 
 		if (cacheBustingParam) {
 			queryString = queryString.filter(param => param.name !== cacheBustingParam);
@@ -180,20 +180,25 @@ function harCachingProxy (options, isOutputVisible) {
 		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
 		harObject.log.entries.forEach(function (entry) {
 			let key = genKeyFromHarReq(entry.request, cacheBustingParam);
-			routeCache[key] = entry;
-			console.log(key);
+
+			// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
+			if (entry.response.content.text) {
+				if (entry.response.headers) {
+					// Remove content-encoding. gzip compression won't be used
+					entry.response.headers = convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding')
+					routeCache[key] = entry;
+				}
+
+				printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+			}
 		});
 	}
 
+	// TODO: Figure out how to cache POST DATA on Requests and still allow the proxy to work
+	//app.use(bodyParser.raw({ type: '*/*' }));
+
 	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
 	app.use('/', proxy(remoteServerUrl, {
-		//parseReqBody: false,
-
-		proxyReqBodyDecorator: function(postData, req) {
-			req.postData = postData;
-			return postData;
-		},
-
 		filter: function(req) {
 			let key = genKeyFromExpressReq(req, cacheBustingParam);
 			let isCached = !!routeCache[key];
@@ -219,7 +224,6 @@ function harCachingProxy (options, isOutputVisible) {
 		}
 	}));
 
-	app.use(bodyParser.raw({ type: '*/*' }));
 
 	// Read from the cache if possible for any routes not being handled by previous middleware
 	app.use('/', function readFromRouteCache (req, res, next) {
@@ -230,17 +234,19 @@ function harCachingProxy (options, isOutputVisible) {
 			if (entry && entry.response && entry.response.content) {
 				let response = entry.response;
 				let headerList = response.headers || [];
+				let text = response.content.text || '';
+				let encoding = response.content.encoding || 'utf8';
 
 				headerList.forEach(function (header) {
 					res.set(header.name, header.value);
 				});
 
 				// TODO: Handle redirects properly
-				if (response.content.text.length === 0) {
+				if (text.length === 0) {
 					res.sendStatus(response.status);
 				} else {
-					if (response.content.encoding === 'base64') {
-						let bin = new Buffer(response.content.text, 'base64');
+					if (encoding === 'base64') {
+						let bin = new Buffer(text, 'base64');
 						res.writeHead(response.status, {
 							'Content-Type': response.content.mimeType,
 							'Content-Length': bin.length
@@ -249,7 +255,7 @@ function harCachingProxy (options, isOutputVisible) {
 					} else {
 						res.status(response.status);
 						res.type(response.content.mimeType);
-						res.send(response.content.text);
+						res.send(text);
 					}
 				}
 
