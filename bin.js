@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const version = require('./package.json').version;
 const harCachingProxy = require('./');
 const program = require('commander');
@@ -24,17 +26,17 @@ if (!program.url) {
 	let remoteServerUrl = program.url;
 	let proxyPort = program.port || defaultPort;
 	let inputHarFile = program.inputfile;
-	let outputHarFile = program.outputfile; // TODO
 	let cacheBustingParams = program.bust;
 	let cacheEverything = !!program.everything;
 
-	console.log('==>', cacheEverything);
 	harCachingProxy({
 		remoteServerUrl,
 		inputHarFile,
-		outputHarFile,
 		proxyPort,
 		cacheEverything,
 		cacheBustingParams
 	}, true).start();
 }
+
+
+// TODO: Fix Tests
