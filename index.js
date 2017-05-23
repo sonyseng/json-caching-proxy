@@ -1,4 +1,4 @@
-const package = require('./package.json')
+const package = require('./package.json');
 const fs = require('fs');
 const rimraf = require('rimraf');
 const path = require('path');
@@ -12,7 +12,7 @@ const chalk = require('chalk');
 
 // TODO: Write HAR File
 
-function harCachingProxy (options, isOutputVisible) {
+function jsonCachingProxy (options, isOutputVisible) {
 	let {
 		// Get all the options passed to the function
 		remoteServerUrl,
@@ -316,7 +316,7 @@ function harCachingProxy (options, isOutputVisible) {
 	}
 }
 
-module.exports = harCachingProxy;
+module.exports = jsonCachingProxy;
 
 
 
