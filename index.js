@@ -1,3 +1,4 @@
+const package = require('./package.json')
 const fs = require('fs');
 const rimraf = require('rimraf');
 const path = require('path');
@@ -111,38 +112,6 @@ function harCachingProxy (options, isOutputVisible) {
 		return entry;
 	}
 
-	//
-	//function persistResponseData (directory, fileName, responseStr) {
-	//	let responseFilePath = path.join(directory, fileName);
-	//
-	//	printLog(chalk.yellow('Saving to File Cache', chalk.bold(responseFilePath)));
-	//
-	//	mkdirp(directory, function (err) {
-	//		if (err) {
-	//			printError(chalk.red(err));
-	//		} else {
-	//			fs.writeFile(responseFilePath, responseStr, function (err) {
-	//				if (err) {
-	//					printError(chalk.red(err));
-	//					return;
-	//				}
-	//			});
-	//		}
-	//	});
-	//}
-	//
-	//function readResponseData (directory, callback) {
-	//	let responseFilePath = path.join(directory, responseFileName);
-	//
-	//	printLog(chalk.green('Reading From Cache', chalk.bold(responseFilePath)));
-	//
-	//	fs.readFile(responseFilePath, 'utf-8', function read (err, responseData) {
-	//		if (!err) {
-	//			callback && callback(responseData);
-	//		}
-	//	});
-	//}
-
 	// These are not really restful because the GET is changing state. But it's easier to use in a browser
 	app.get(`/${commandPrefix}/playback`, function (req, res) {
 		dataPlayback = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataPlayback;
@@ -160,8 +129,25 @@ function harCachingProxy (options, isOutputVisible) {
 		routeCache = {};
 		printLog(chalk.blue('Cleared cache'));
 		res.send('Cleared cache');
+	});
 
-		//rimraf(path.join(currentWorkingDir, cacheDataDirectory), function () {});
+	app.get(`/${commandPrefix}/har`, function (req, res) {
+		printLog(chalk.blue('Generating har file'));
+
+		let har = {
+			log: {
+				version: "1.2",
+				creator: {
+					name: package.name,
+					version: package.version
+				},
+				entries: []
+			}
+		};
+
+		Object.keys(routeCache).forEach(key => har.log.entries.push(routeCache[key]));
+
+		res.json(har);
 	});
 
 	// User supplied middleware to handle special cases (browser-sync middleware options)
@@ -179,8 +165,6 @@ function harCachingProxy (options, isOutputVisible) {
 		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
 		harObject.log.entries.forEach(function (entry) {
 			let key = genKeyFromHarReq(entry.request, excludedParamMap);
-
-			// TODO: Check MimeType cacheEverything
 
 			// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
 			if (entry.response.content.text) {

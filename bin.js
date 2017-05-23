@@ -14,7 +14,6 @@ program
 	.option('-u, --url <url>', 'Remote server to proxy (e.g. https://network:8080)')
 	.option('-p, --port [n]', 'Port for the local proxy server (Default: ' + defaultPort + ')', parseInt)
 	.option('-i, --inputfile [path]', 'Load an existing HAR file and hydrate the cache')
-	.option('-o, --outputfile [path]', 'Output all cached routes to a new HAR file')
 	.option('-b, --bust [items]', 'A list of Cache Busting Query Params to ignore. e.g. --bust _:cacheSlayer:time:dc', list)
 	.option('-z, --everything', 'Try to cache everything in addition to JSON')
 	.parse(process.argv);
