@@ -20,17 +20,18 @@ function harCachingProxy (options, isOutputVisible) {
 		proxyPort,
 		middlewareList,
 		commandPrefix='proxy',
-		proxyHeaderIdentifier = 'cached-proxy-playback',
-		cacheBustingParam, // TODO: Handle multiple ways of cache busting. Multi params, headers, etc.
-
-		dataPlayback = true,
-		dataRecord = true
+		proxyHeaderIdentifier='cached-proxy-playback',
+		cacheBustingParams=[],
+		cacheEverything=false,
+		dataPlayback=true,
+		dataRecord=true
 		} = options;
 
 	let app = express();
 	let currentWorkingDir = process.cwd();
 	let server, printLog, printError;
 
+	let excludedParamMap = cacheBustingParams.reduce((map, param) => { map[param] = true; return map }, {});
 	let routeCache = {};
 
 	if (isOutputVisible) {
@@ -45,18 +46,16 @@ function harCachingProxy (options, isOutputVisible) {
 		return typeof obj === 'object' ? Object.keys(obj).map(key => { return { name: key, value: obj[key] }; }) : [];
 	}
 
-	function genKeyFromHarReq (harEntryReq, cacheBustingParam) {
+	function genKeyFromHarReq (harEntryReq, excludedParamMap) {
 		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
 		let uri = urlUtil.parse(url).pathname;
 		let postParams = postData.text; // TODO: Use MD5 Hash?
 
-		if (cacheBustingParam) {
-			queryString = queryString.filter(param => param.name !== cacheBustingParam);
-		}
+		queryString = queryString.filter(param => !excludedParamMap[param.name]);
 		return `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
 	}
 
-	function genKeyFromExpressReq (req, cacheBustingParam) {
+	function genKeyFromExpressReq (req, excludedParamMap) {
 		let queryString = convertToNameValueList(req.query);
 
 		return genKeyFromHarReq({
@@ -66,7 +65,7 @@ function harCachingProxy (options, isOutputVisible) {
 
 			// TODO: Use MD5 Hash?
 			postData: { text: req.postData && req.postData.length > 0 ? req.postData.toString('utf8') : '' }
-		}, cacheBustingParam);
+		}, excludedParamMap);
 	}
 
 	// Create a HAR from a proxied express request and response
@@ -179,17 +178,20 @@ function harCachingProxy (options, isOutputVisible) {
 	if (inputHarFile) {
 		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
 		harObject.log.entries.forEach(function (entry) {
-			let key = genKeyFromHarReq(entry.request, cacheBustingParam);
+			let key = genKeyFromHarReq(entry.request, excludedParamMap);
+
+			// TODO: Check MimeType cacheEverything
 
 			// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
 			if (entry.response.content.text) {
-				if (entry.response.headers) {
-					// Remove content-encoding. gzip compression won't be used
-					entry.response.headers = convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding')
-					routeCache[key] = entry;
-				}
+				let mimeType = entry.response.content.mimeType;
 
-				printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+				if (entry.response.headers && (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
+					// Remove content-encoding. gzip compression won't be used
+					entry.response.headers = convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
+					routeCache[key] = entry;
+					printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+				}
 			}
 		});
 	}
@@ -200,7 +202,7 @@ function harCachingProxy (options, isOutputVisible) {
 	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
 	app.use('/', proxy(remoteServerUrl, {
 		filter: function(req) {
-			let key = genKeyFromExpressReq(req, cacheBustingParam);
+			let key = genKeyFromExpressReq(req, excludedParamMap);
 			let isCached = !!routeCache[key];
 			return !isCached;
 		},
@@ -213,11 +215,19 @@ function harCachingProxy (options, isOutputVisible) {
 					res.location(urlUtil.parse(location).path);
 				}
 
-				let key = genKeyFromExpressReq(req, cacheBustingParam);
-				let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
+				let mimeType = res._headers['content-type'];
 
-				routeCache[key] = entry;
-				printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+				if (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
+					let key = genKeyFromExpressReq(req, excludedParamMap);
+					let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
+
+					routeCache[key] = entry;
+					printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+				} else {
+					printLog(chalk.gray('Proxied Resource', req.path));
+				}
+			} else {
+				printLog(chalk.gray('Proxied Resource', req.path));
 			}
 
 			return rspData;
@@ -228,7 +238,7 @@ function harCachingProxy (options, isOutputVisible) {
 	// Read from the cache if possible for any routes not being handled by previous middleware
 	app.use('/', function readFromRouteCache (req, res, next) {
 		if (dataPlayback) {
-			let key = genKeyFromExpressReq(req, cacheBustingParam);
+			let key = genKeyFromExpressReq(req, excludedParamMap);
 			let entry = routeCache[key];
 
 			if (entry && entry.response && entry.response.content) {
@@ -260,12 +270,15 @@ function harCachingProxy (options, isOutputVisible) {
 				}
 
 				printLog(chalk.green('Reading From Cache', chalk.bold(entry.request.url)));
+
 			} else {
 				next();
 			}
+
 		} else {
 			next();
 		}
+
 	});
 
 
@@ -274,16 +287,23 @@ function harCachingProxy (options, isOutputVisible) {
 			server = app.listen(proxyPort);
 			printLog(chalk.bold(`\nStarting Proxy Server:`));
 			printLog(chalk.gray(`======================\n`));
+
 			printLog(`Remote Server URL: ${chalk.bold(remoteServerUrl)}`);
 			printLog(`Proxy running on port: ${chalk.bold(proxyPort)}`);
 
-			inputHarFile && printLog(`HAR Input File: ${chalk.bold(path.join(currentWorkingDir, inputHarFile))}`);
-			outputHarFile && printLog(`HAR Output File: ${chalk.bold(path.join(currentWorkingDir, outputHarFile))}`);
+			inputHarFile && printLog(`HAR input: ${chalk.bold(path.join(currentWorkingDir, inputHarFile))}`);
+			outputHarFile && printLog(`HAR output: ${chalk.bold(path.join(currentWorkingDir, outputHarFile))}`);
 
-			printLog(`Cached Playback: ${chalk.bold(dataPlayback)}`);
-			printLog(`Cache persistence: ${chalk.bold(dataRecord)}`);
-			printLog(`Command Prefix: ${chalk.bold(commandPrefix)}`);
-			printLog(`Response header ID: ${chalk.bold(proxyHeaderIdentifier)}\n`);
+			printLog(`Replay cache: ${chalk.bold(dataPlayback)}`);
+			printLog(`Save to cache: ${chalk.bold(dataRecord)}`);
+			printLog(`Command prefix: ${chalk.bold(commandPrefix)}`);
+			printLog(`Proxy response header: ${chalk.bold(proxyHeaderIdentifier)}`);
+			printLog(`Try to cache all responses: ${chalk.bold(cacheEverything)}`);
+
+			cacheBustingParams.length > 0 && printLog(`Ignoring query parameters: ${chalk.bold(cacheBustingParams)}`);
+
+			printLog('\n');
+
 			return app;
 		},
 
