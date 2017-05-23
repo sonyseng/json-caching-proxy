@@ -1,217 +1,322 @@
+const package = require('./package.json')
 const fs = require('fs');
 const rimraf = require('rimraf');
 const path = require('path');
 const mkdirp = require('mkdirp');
 const express = require('express');
 const proxy = require('express-http-proxy');
+const bodyParser = require('body-parser');
 const request = require('request');
-const url = require('url');
+const urlUtil = require('url');
 const chalk = require('chalk');
 
-const responseFileName = 'response.json';
+// TODO: Write HAR File
 
-function jsonCachingProxy (options, isDebugging) {
-  // Destructure options
-  let {
-    remoteServerUrl,
-    proxyPort,
-    cacheDataDirectory,
-    middlewareList,
-    commandPrefix='proxy',
-    proxyHeaderIdentifier = 'json-cached-proxy-playback',
+function harCachingProxy (options, isOutputVisible) {
+	let {
+		// Get all the options passed to the function
+		remoteServerUrl,
+		inputHarFile,
+		outputHarFile,
+		proxyPort,
+		middlewareList,
+		commandPrefix='proxy',
+		proxyHeaderIdentifier='cached-proxy-playback',
+		cacheBustingParams=[],
+		cacheEverything=false,
+		dataPlayback=true,
+		dataRecord=true
+		} = options;
 
-    dataPlayback = true,
-    dataRecord = true,
-    dataOverwrite = false
-  } = options;
+	let app = express();
+	let currentWorkingDir = process.cwd();
+	let server, printLog, printError;
 
-  let app = express();
-  let currentWorkingDir = process.cwd();
-  let server, printLog, printError;
+	let excludedParamMap = cacheBustingParams.reduce((map, param) => { map[param] = true; return map }, {});
+	let routeCache = {};
 
-  if (isDebugging) {
-    printLog = console.log;
-    printError = console.error;
-  } else {
-    printLog = () => false;
-    printError = () => false;
-  }
+	if (isOutputVisible) {
+		printLog = console.log;
+		printError = console.error;
+	} else {
+		printLog = () => false;
+		printError = () => false;
+	}
 
-  let persistResponseData = (directory, fileName, responseStr) => {
-    let responseFilePath = path.join(directory, fileName);
+	function convertToNameValueList (obj) {
+		return typeof obj === 'object' ? Object.keys(obj).map(key => { return { name: key, value: obj[key] }; }) : [];
+	}
 
-    printLog(chalk.yellow('Saving to File Cache', chalk.bold(responseFilePath)));
+	function genKeyFromHarReq (harEntryReq, excludedParamMap) {
+		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
+		let uri = urlUtil.parse(url).pathname;
+		let postParams = postData.text; // TODO: Use MD5 Hash?
 
-    mkdirp(directory, function (err) {
-      if (err) {
-        printError(chalk.red(err));
-      } else {
-        fs.writeFile(responseFilePath, responseStr, function (err) {
-          if (err) {
-            printError(chalk.red(err));
-            return;
-          }
-        });
-      }
-    });
-  };
+		queryString = queryString.filter(param => !excludedParamMap[param.name]);
+		return `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
+	}
 
-  let readResponseData = (directory, callback) => {
-    let responseFilePath = path.join(directory, responseFileName);
+	function genKeyFromExpressReq (req, excludedParamMap) {
+		let queryString = convertToNameValueList(req.query);
 
-    printLog(chalk.green('Reading From Cache', chalk.bold(responseFilePath)));
+		return genKeyFromHarReq({
+			method: req.method,
+			url: req.url,
+			queryString: queryString,
 
-    fs.readFile(responseFilePath, 'utf-8', function read(err, responseData) {
-      if (!err) {
-        callback && callback(responseData);
-      }
-    });
-  };
+			// TODO: Use MD5 Hash?
+			postData: { text: req.postData && req.postData.length > 0 ? req.postData.toString('utf8') : '' }
+		}, excludedParamMap);
+	}
 
-  // These are not really restful because the GET is changing state. But it's easier to use in a browser
-  app.use(`/${commandPrefix}/playback`, function (req, res) {
-    dataPlayback = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataPlayback;
-    printLog(chalk.blue(`Replay from cache: ${dataPlayback}`));
-    res.send(`Replay from cache: ${dataPlayback}`);
-  });
+	// Create a HAR from a proxied express request and response
+	function createHarEntry (startedDateTime, req, res, data) {
+		let reqMimeType = req.get('Content-Type');
+		let resMimeType = res.get('Content-Type') || 'text/plain';
+		let encoding = (/^text\/|^application\/(javascript|json)/).test(resMimeType) ? 'utf8' : 'base64';
 
-  app.use(`/${commandPrefix}/record`, function (req, res) {
-    dataRecord = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataRecord;
-    printLog(chalk.blue('Saving to cache: ' + dataRecord));
-    res.send(`Saving to cache: ${dataRecord}`);
-  });
+		let entry = {
+			request: {
+				startedDateTime: startedDateTime,
+				method: req.method.toUpperCase(),
+				url: req.url,
+				cookies: convertToNameValueList(req.cookies),
+				headers: convertToNameValueList(req.headers),
+				queryString: convertToNameValueList(req.query),
+				headersSize: -1,
+				bodySize: -1
+			},
+			response: {
+				status: res.statusCode,
+				statusText: res.statusMessage,
+				cookies: convertToNameValueList(res.cookies),
+				headers: convertToNameValueList(res._headers).filter(header => header.name.toLowerCase() !== 'content-encoding'), // Not  compressed
+				content: {
+					size: -1,
+					mimeType: resMimeType,
+					text: data.toString(encoding),
+					encoding: encoding
+				},
+				headersSize: -1,
+				bodySize: -1
+			}
+		};
 
-  app.use(`/${commandPrefix}/overwrite`, function (req, res) {
-    dataOverwrite = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataOverwrite;
-    printLog(chalk.blue('Overwrite existing cache: ' + dataOverwrite));
-    res.send(`Overwrite existing cache: ${dataOverwrite}`);
-  });
+		if (req.postData && req.postData.length > 0) {
+			entry.request.postData = {
+				mimeType: reqMimeType,
+				text: req.postData.toString(encoding)
+			}
+		}
 
-  app.use(`/${commandPrefix}/clear`, function (req, res) {
-    rimraf(path.join(currentWorkingDir, cacheDataDirectory), function () {
-      printLog(chalk.blue('Cleared cache'));
-      res.send('Cleared cache');
-    });
-  });
+		return entry;
+	}
 
-  // User supplied middleware to handle special cases (browser-sync middleware options)
-  if (middlewareList && middlewareList.length > 0) {
-    middlewareList.forEach((mw) => {
-      if (mw.route) {
-        app.use(mw.route, mw.handle);
-      } else {
-        app.use(mw.handle);
-      }
-    });
-  }
+	// These are not really restful because the GET is changing state. But it's easier to use in a browser
+	app.get(`/${commandPrefix}/playback`, function (req, res) {
+		dataPlayback = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataPlayback;
+		printLog(chalk.blue(`Replay from cache: ${dataPlayback}`));
+		res.send(`Replay from cache: ${dataPlayback}`);
+	});
 
-  app.use('/', function (req, res, next) {
-    let resource = req.path;
+	app.get(`/${commandPrefix}/record`, function (req, res) {
+		dataRecord = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataRecord;
+		printLog(chalk.blue('Saving to cache: ' + dataRecord));
+		res.send(`Saving to cache: ${dataRecord}`);
+	});
 
-    if (!dataOverwrite && dataPlayback) {
-      let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `${key}/${req.query[key]}`).join('/');
-      let directory = path.join(currentWorkingDir, cacheDataDirectory, resource, queryParamPath);
+	app.get(`/${commandPrefix}/clear`, function (req, res) {
+		routeCache = {};
+		printLog(chalk.blue('Cleared cache'));
+		res.send('Cleared cache');
+	});
 
-      // Read from a file if it exists
-      fs.stat(directory, function (err) {
-        if (!err) {
-          readResponseData(directory, function (responseData) {
-            res.setHeader('content-type', 'application/json;charset=UTF-8');
-            res.setHeader(proxyHeaderIdentifier, 'true');
-            res.send(responseData);
-          });
-        } else {
-          printLog(chalk.gray('Proxied Resource', req.path));
-          next();
-        }
-      });
-    } else {
-      printLog(chalk.gray('_Proxied Resource', req.path));
-      next();
-    }
-  });
+	app.get(`/${commandPrefix}/har`, function (req, res) {
+		printLog(chalk.blue('Generating har file'));
 
-  // Persist JSON data when needed
-  app.use('/', proxy(remoteServerUrl, {
-    intercept: function (rsp, data, req, res, callback) {
-      if (dataRecord) {
-        let contentType = res.header()._headers['content-type'];
+		let har = {
+			log: {
+				version: "1.2",
+				creator: {
+					name: package.name,
+					version: package.version
+				},
+				entries: []
+			}
+		};
 
-        if (contentType && contentType.indexOf('application/json') >= 0) {
-          let resource = req.path;
-          let queryParamPath = Object.keys(req.query).map(key => key === '_' ? '' : `${key}/${req.query[key]}`).join('/');
-          let directory = path.join(currentWorkingDir, cacheDataDirectory, resource, queryParamPath);
+		Object.keys(routeCache).forEach(key => har.log.entries.push(routeCache[key]));
 
-          if (dataOverwrite) {
-            // Always create data even if the file exists
-            persistResponseData(directory, responseFileName, data.toString('utf8'));
-          } else {
-            // Only create new files
-            fs.stat(path.join(directory, responseFileName), function (err) {
-              if (err && err.code === 'ENOENT') {
-                persistResponseData(directory, responseFileName, data.toString('utf8'));
-              }
-            });
-          }
-        }
+		res.json(har);
+	});
 
-        // Handle Redirects
-        let location = res.get('location');
-        if (location) {
-          res.location(url.parse(location).path);
-        }
-      }
+	// User supplied middleware to handle special cases (browser-sync middleware options)
+	if (middlewareList && middlewareList.length > 0) {
+		middlewareList.forEach((mw) => {
+			if (mw.route) {
+				app.use(mw.route, mw.handle);
+			} else {
+				app.use(mw.handle);
+			}
+		});
+	}
 
-      callback(null, data);
-    }
-  }));
+	if (inputHarFile) {
+		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
+		harObject.log.entries.forEach(function (entry) {
+			let key = genKeyFromHarReq(entry.request, excludedParamMap);
 
-  return {
-    start: function () {
-      server = app.listen(proxyPort);
-      printLog(chalk.bold(`\nStarting Proxy Server:`));
-      printLog(chalk.gray(`======================\n`));
-      printLog(`Remote Server URL: ${chalk.bold(remoteServerUrl)}`);
-      printLog(`Proxy running on port: ${chalk.bold(proxyPort)}`);
-      printLog(`Persisting JSON to: ${chalk.bold(path.join(currentWorkingDir, cacheDataDirectory))}`);
-      printLog(`Cached Playback: ${chalk.bold(dataPlayback)}`);
-      printLog(`Cache persistence: ${chalk.bold(dataRecord)}`);
-      printLog(`Always Overwrite cache: ${chalk.bold(dataOverwrite)}`);
-      printLog(`Command Prefix: ${chalk.bold(commandPrefix)}`);
-      printLog(`Response header ID: ${chalk.bold(proxyHeaderIdentifier)}\n`);
-      return app;
-    },
+			// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
+			if (entry.response.content.text) {
+				let mimeType = entry.response.content.mimeType;
 
-    stop: function () {
-      if (server) {
-        server.close();
-        printLog(chalk.bold('\nStopping Proxy Server'));
-      }
-    },
+				if (entry.response.headers && (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
+					// Remove content-encoding. gzip compression won't be used
+					entry.response.headers = convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
+					routeCache[key] = entry;
+					printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+				}
+			}
+		});
+	}
 
-    getServer: function () {
-      return server;
-    },
+	// TODO: Figure out how to cache POST DATA on Requests and still allow the proxy to work
+	//app.use(bodyParser.raw({ type: '*/*' }));
 
-    getExpressApp: function () {
-      return app;
-    },
+	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
+	app.use('/', proxy(remoteServerUrl, {
+		filter: function(req) {
+			let key = genKeyFromExpressReq(req, excludedParamMap);
+			let isCached = !!routeCache[key];
+			return !isCached;
+		},
 
-    isReplaying: function () {
-      return dataPlayback
-    },
+		userResDecorator: function (rsp, rspData, req, res) {
+			if (dataRecord) {
+				let location = res.get('location');
+				if (location) {
+					// Handle Redirects
+					res.location(urlUtil.parse(location).path);
+				}
 
-    isRecording: function () {
-      return dataRecord;
-    },
+				let mimeType = res._headers['content-type'];
 
-    isOverwriting: function () {
-      return dataOverwrite;
-    }
-  }
+				if (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
+					let key = genKeyFromExpressReq(req, excludedParamMap);
+					let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
+
+					routeCache[key] = entry;
+					printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+				} else {
+					printLog(chalk.gray('Proxied Resource', req.path));
+				}
+			} else {
+				printLog(chalk.gray('Proxied Resource', req.path));
+			}
+
+			return rspData;
+		}
+	}));
+
+
+	// Read from the cache if possible for any routes not being handled by previous middleware
+	app.use('/', function readFromRouteCache (req, res, next) {
+		if (dataPlayback) {
+			let key = genKeyFromExpressReq(req, excludedParamMap);
+			let entry = routeCache[key];
+
+			if (entry && entry.response && entry.response.content) {
+				let response = entry.response;
+				let headerList = response.headers || [];
+				let text = response.content.text || '';
+				let encoding = response.content.encoding || 'utf8';
+
+				headerList.forEach(function (header) {
+					res.set(header.name, header.value);
+				});
+
+				// TODO: Handle redirects properly
+				if (text.length === 0) {
+					res.sendStatus(response.status);
+				} else {
+					if (encoding === 'base64') {
+						let bin = new Buffer(text, 'base64');
+						res.writeHead(response.status, {
+							'Content-Type': response.content.mimeType,
+							'Content-Length': bin.length
+						});
+						res.end(bin);
+					} else {
+						res.status(response.status);
+						res.type(response.content.mimeType);
+						res.send(text);
+					}
+				}
+
+				printLog(chalk.green('Reading From Cache', chalk.bold(entry.request.url)));
+
+			} else {
+				next();
+			}
+
+		} else {
+			next();
+		}
+
+	});
+
+
+	return {
+		start: function () {
+			server = app.listen(proxyPort);
+			printLog(chalk.bold(`\nStarting Proxy Server:`));
+			printLog(chalk.gray(`======================\n`));
+
+			printLog(`Remote Server URL: ${chalk.bold(remoteServerUrl)}`);
+			printLog(`Proxy running on port: ${chalk.bold(proxyPort)}`);
+
+			inputHarFile && printLog(`HAR input: ${chalk.bold(path.join(currentWorkingDir, inputHarFile))}`);
+			outputHarFile && printLog(`HAR output: ${chalk.bold(path.join(currentWorkingDir, outputHarFile))}`);
+
+			printLog(`Replay cache: ${chalk.bold(dataPlayback)}`);
+			printLog(`Save to cache: ${chalk.bold(dataRecord)}`);
+			printLog(`Command prefix: ${chalk.bold(commandPrefix)}`);
+			printLog(`Proxy response header: ${chalk.bold(proxyHeaderIdentifier)}`);
+			printLog(`Try to cache all responses: ${chalk.bold(cacheEverything)}`);
+
+			cacheBustingParams.length > 0 && printLog(`Ignoring query parameters: ${chalk.bold(cacheBustingParams)}`);
+
+			printLog('\n');
+
+			return app;
+		},
+
+		stop: function () {
+			if (server) {
+				server.close();
+				printLog(chalk.bold('\nStopping Proxy Server'));
+			}
+		},
+
+		getServer: function () {
+			return server;
+		},
+
+		getExpressApp: function () {
+			return app;
+		},
+
+		isReplaying: function () {
+			return dataPlayback
+		},
+
+		isRecording: function () {
+			return dataRecord;
+		}
+	}
 }
 
-module.exports = jsonCachingProxy;
+module.exports = harCachingProxy;
 
 
 

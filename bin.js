@@ -1,29 +1,40 @@
-#!/usr/bin/env node
-
-const jsonCachingProxy = require('./');
+const version = require('./package.json').version;
+const harCachingProxy = require('./');
 const program = require('commander');
 const url = require('url');
 
 const defaultPort = 3001;
-const defaultCacheDir = 'cache';
+
+function list (val) {
+	return val.split(':').map(item => item.trim());
+}
 
 program
-  .version('1.0.8')
-  .option('-u, --url <url>', 'Remote server to proxy (e.g. https://network:8080)')
-  .option('-p, --port [n]', 'Port for the local proxy server (Default: '+ defaultPort +')', parseInt)
-  .option('-d, --dir [path]', 'Local Directory to store JSON responses (Default: "'+ defaultCacheDir +'")')
-  .parse(process.argv);
+	.version(version)
+	.option('-u, --url <url>', 'Remote server to proxy (e.g. https://network:8080)')
+	.option('-p, --port [n]', 'Port for the local proxy server (Default: ' + defaultPort + ')', parseInt)
+	.option('-i, --inputfile [path]', 'Load an existing HAR file and hydrate the cache')
+	.option('-b, --bust [items]', 'A list of Cache Busting Query Params to ignore. e.g. --bust _:cacheSlayer:time:dc', list)
+	.option('-z, --everything', 'Try to cache everything in addition to JSON')
+	.parse(process.argv);
 
 if (!program.url) {
-  program.outputHelp();
+	program.outputHelp();
 } else {
-  let remoteServerUrl = program.url;
-  let proxyPort = program.port || defaultPort;
-  let cacheDataDirectory = program.dir || defaultCacheDir; // Directory relative to this file
+	let remoteServerUrl = program.url;
+	let proxyPort = program.port || defaultPort;
+	let inputHarFile = program.inputfile;
+	let outputHarFile = program.outputfile; // TODO
+	let cacheBustingParams = program.bust;
+	let cacheEverything = !!program.everything;
 
-  jsonCachingProxy({
-    remoteServerUrl,
-    proxyPort,
-    cacheDataDirectory
-  }, true).start();
+	console.log('==>', cacheEverything);
+	harCachingProxy({
+		remoteServerUrl,
+		inputHarFile,
+		outputHarFile,
+		proxyPort,
+		cacheEverything,
+		cacheBustingParams
+	}, true).start();
 }
