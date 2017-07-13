@@ -1,4 +1,5 @@
 const package = require('./package.json');
+const crypto = require('crypto');
 const fs = require('fs');
 const rimraf = require('rimraf');
 const path = require('path');
@@ -9,8 +10,6 @@ const bodyParser = require('body-parser');
 const request = require('request');
 const urlUtil = require('url');
 const chalk = require('chalk');
-
-// TODO: Write HAR File
 
 function jsonCachingProxy (options, isOutputVisible) {
 	let {
@@ -53,7 +52,9 @@ function jsonCachingProxy (options, isOutputVisible) {
 		let postParams = postData.text; // TODO: Use MD5 Hash?
 
 		queryString = queryString.filter(param => !excludedParamMap[param.name]);
-		return `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
+		var plainText = `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
+
+		return crypto.createHash('md5').update(plainText).digest("hex");
 	}
 
 	function genKeyFromExpressReq (req, excludedParamMap) {
