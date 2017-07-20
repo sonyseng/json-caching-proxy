@@ -1,7 +1,7 @@
 const package = require('./package.json');
+const stream = require('stream');
 const crypto = require('crypto');
 const fs = require('fs');
-const rimraf = require('rimraf');
 const path = require('path');
 const mkdirp = require('mkdirp');
 const express = require('express');
@@ -49,24 +49,24 @@ function jsonCachingProxy (options, isOutputVisible) {
 	function genKeyFromHarReq (harEntryReq, excludedParamMap) {
 		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
 		let uri = urlUtil.parse(url).pathname;
-		let postParams = postData.text; // TODO: Use MD5 Hash?
+		let postParams = postData.text;
 
 		queryString = queryString.filter(param => !excludedParamMap[param.name]);
-		var plainText = `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
 
-		return crypto.createHash('md5').update(plainText).digest("hex");
+		let plainText = `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
+		let hash = crypto.createHash('md5').update(plainText).digest("hex");
+		let key = `${method} ${uri} ${hash}`;
+
+		return {key, hash};
 	}
 
 	function genKeyFromExpressReq (req, excludedParamMap) {
 		let queryString = convertToNameValueList(req.query);
-
 		return genKeyFromHarReq({
 			method: req.method,
 			url: req.url,
 			queryString: queryString,
-
-			// TODO: Use MD5 Hash?
-			postData: { text: req.postData && req.postData.length > 0 ? req.postData.toString('utf8') : '' }
+			postData: { text: req.body.length > 0 ? req.body.toString('utf8') : '' }
 		}, excludedParamMap);
 	}
 
@@ -165,7 +165,7 @@ function jsonCachingProxy (options, isOutputVisible) {
 	if (inputHarFile) {
 		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
 		harObject.log.entries.forEach(function (entry) {
-			let key = genKeyFromHarReq(entry.request, excludedParamMap);
+			let {key, hash} = genKeyFromHarReq(entry.request, excludedParamMap);
 
 			// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
 			if (entry.response.content.text) {
@@ -175,58 +175,25 @@ function jsonCachingProxy (options, isOutputVisible) {
 					// Remove content-encoding. gzip compression won't be used
 					entry.response.headers = convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
 					routeCache[key] = entry;
-					printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
+					printLog(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.url)));
 				}
 			}
 		});
 	}
 
-	// TODO: Figure out how to cache POST DATA on Requests and still allow the proxy to work
-	//app.use(bodyParser.raw({ type: '*/*' }));
-
-	// Handle the proxied response by writing the response to cache if possible and altering location redirects if needed
-	app.use('/', proxy(remoteServerUrl, {
-		filter: function(req) {
-			let key = genKeyFromExpressReq(req, excludedParamMap);
-			let isCached = !!routeCache[key];
-			return !isCached;
-		},
-
-		userResDecorator: function (rsp, rspData, req, res) {
-			if (dataRecord) {
-				let location = res.get('location');
-				if (location) {
-					// Handle Redirects
-					res.location(urlUtil.parse(location).path);
-				}
-
-				let mimeType = res._headers['content-type'];
-
-				if (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
-					let key = genKeyFromExpressReq(req, excludedParamMap);
-					let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
-
-					routeCache[key] = entry;
-					printLog(chalk.yellow('Saved to Cache', chalk.bold(entry.request.url)));
-				} else {
-					printLog(chalk.gray('Proxied Resource', req.path));
-				}
-			} else {
-				printLog(chalk.gray('Proxied Resource', req.path));
-			}
-
-			return rspData;
-		}
-	}));
-
+	app.use(bodyParser.raw({type: '*/*'}));
 
 	// Read from the cache if possible for any routes not being handled by previous middleware
-	app.use('/', function readFromRouteCache (req, res, next) {
-		if (dataPlayback) {
-			let key = genKeyFromExpressReq(req, excludedParamMap);
+	app.use('/', function (req, res, next) {
+		if (!dataPlayback) {
+			next();
+		} else {
+			let {key, hash} = genKeyFromExpressReq(req, excludedParamMap);
 			let entry = routeCache[key];
 
-			if (entry && entry.response && entry.response.content) {
+			if (!(entry && entry.response && entry.response.content)) {
+				next();
+			} else {
 				let response = entry.response;
 				let headerList = response.headers || [];
 				let text = response.content.text || '';
@@ -254,18 +221,40 @@ function jsonCachingProxy (options, isOutputVisible) {
 					}
 				}
 
-				printLog(chalk.green('Reading From Cache', chalk.bold(entry.request.url)));
-
-			} else {
-				next();
+				printLog(chalk.green('Reading From Cache', hash, chalk.bold(entry.request.url)));
 			}
 
-		} else {
-			next();
 		}
-
 	});
 
+	// Handle the proxy response by writing the response to cache if possible and altering location redirects if needed
+	app.use('/', proxy(remoteServerUrl, {
+		userResDecorator: function (rsp, rspData, req, res) {
+			if (!dataRecord) {
+				printLog(chalk.gray('Proxied Resource', req.path));
+			} else {
+
+				let location = res.get('location');
+				if (location) {
+					// Handle Redirects
+					res.location(urlUtil.parse(location).path);
+				}
+
+				let mimeType = res._headers['content-type'];
+
+				if (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
+					let {key, hash} = genKeyFromExpressReq(req, excludedParamMap);
+					let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
+					routeCache[key] = entry;
+					printLog(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.url)));
+				} else {
+					printLog(chalk.gray('Proxied Resource', req.path));
+				}
+			}
+
+			return rspData;
+		}
+	}));
 
 	return {
 		start: function () {
