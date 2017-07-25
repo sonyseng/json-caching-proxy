@@ -1,25 +1,7 @@
 #!/usr/bin/env node
 
-/**
-*************** EXAMPLE CONFIG FILE ************
-* {
-*		"remoteServerUrl": "https://www.google.com:80",
-*		"proxyPort": 3001,
-*		"inputHarFile": "test.har",
-*		"cacheEverything": true,
-*		"cacheBustingParams": ["_", "dc", "cacheSlayer"],
-*		"excludedRouteMatchers": ["/traffic/.*js", "audience"],
-*		"showConsoleOutput": true,
-*		"dataPlayback": true,
-*		"dataRecord": true,
-*		"commandPrefix": "proxy",
-*		"proxyHeaderIdentifier": "bayon-cache-playback"
-* }
-*************** EXAMPLE CONFIG FILE ************
-*/
-
 const version = require('./package.json').version;
-const Bayon = require('./');
+const JsonCachingProxy = require('./');
 
 const fs = require('fs');
 const url = require('url');
@@ -52,8 +34,8 @@ program
 	.option('-a, --all', 'Try to cache everything in addition to JSON (Overrided by --exclude argument)')
 	.option('-dp, --playback', 'Disable cache playback')
 	.option('-dr, --record', 'Disable caching')
-	.option('-cp, --prefix', 'Prefix for controlling proxy (default: bayon-proxy)')
-	.option('-phi, --header', 'Prefix for controlling proxy (default: bayon-cache-playback)')
+	.option('-cp, --prefix', 'Prefix for controlling proxy')
+	.option('-phi, --header', 'Prefix for controlling proxy')
 	.option('-l, --log', 'Show log output to console')
 	.parse(process.argv);
 
@@ -101,7 +83,7 @@ if (inputHarFile) {
 	}
 }
 
-let bayon = new Bayon({
+let jsonCachingProxy = new JsonCachingProxy({
 	remoteServerUrl,
 	harObject,
 	proxyPort,
@@ -115,5 +97,24 @@ let bayon = new Bayon({
 	showConsoleOutput
 });
 
-bayon.start();
+jsonCachingProxy.start();
 
+/**
+ * EXAMPLE CONFIG JSON
+ *
+ * {
+ *		"remoteServerUrl": "https://www.google.com",
+ *		"proxyPort": 3001,
+ *		"inputHarFile": "test.har",
+ *		"cacheEverything": true,
+ *		"cacheBustingParams": ["_", "dc", "cacheSlayer"],
+ *		"excludedRouteMatchers": ["/traffic/.*js", "audience"],
+ *		"showConsoleOutput": true,
+ *		"dataPlayback": true,
+ *		"dataRecord": true,
+ *		"commandPrefix": "proxy",
+ *		"proxyHeaderIdentifier": "bayon-cache-playback"
+ * }
+ *
+ *
+ */

@@ -1,13 +1,13 @@
 {
-  "name": "bayon",
-  "version": "0.0.1",
+  "name": "json-caching-proxy",
+  "version": "1.2.0",
   "scripts": {
     "test": "mocha ./*.spec.js",
     "jsdoc": "jsdoc ./*.js -d ./jsdoc"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/sonyseng/bayon.git"
+    "url": "https://github.com/sonyseng/json-caching-proxy.git"
   },
   "author": "Sony Seng",
   "license": "MIT",

@@ -6,8 +6,8 @@ const bodyParser = require('body-parser');
 const urlUtil = require('url');
 const chalk = require('chalk');
 
-/** The Bayon caching proxy server. */
-class Bayon {
+/** The caching proxy server. */
+class JsonCachingProxy {
 	/**
 	 * @param {Object} options - Options passed into the ctor will override defaults if defined
 	 */
@@ -16,8 +16,8 @@ class Bayon {
 			remoteServerUrl: 'http://localhost:8080',
 			proxyPort: 3001,
 			harObject: null,
-			commandPrefix: 'bayon-proxy',
-			proxyHeaderIdentifier: 'bayon-cache-playback',
+			commandPrefix: 'proxy',
+			proxyHeaderIdentifier: 'caching-proxy-playback',
 			middlewareList: [],
 			excludedRouteMatchers: [],
 			cacheBustingParams: [],
@@ -401,4 +401,4 @@ class Bayon {
 	}
 }
 
-module.exports = Bayon;
+module.exports = JsonCachingProxy;
