@@ -1,0 +1,12 @@
+{
+  "remoteServerUrl": "http://52.205.63.7:8080", //"https://www.google.com",
+  "proxyPort": 3001,
+  "cacheEverything": true,
+  "cacheBustingParams": ["_", "dc", "cacheSlayer"],
+  "excludedRouteMatchers": ["/traffic/.*js", "audience"],
+  "showConsoleOutput": true,
+  "dataPlayback": true,
+  "dataRecord": true,
+  "commandPrefix": "proxy",
+  "proxyHeaderIdentifier": "bayon-cache-playback"
+}

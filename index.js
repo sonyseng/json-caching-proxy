@@ -1,57 +1,64 @@
-const package = require('./package.json');
-const stream = require('stream');
+const npmPackage = require('./package.json');
 const crypto = require('crypto');
-const fs = require('fs');
-const path = require('path');
-const mkdirp = require('mkdirp');
 const express = require('express');
 const proxy = require('express-http-proxy');
 const bodyParser = require('body-parser');
-const request = require('request');
 const urlUtil = require('url');
 const chalk = require('chalk');
 
-function jsonCachingProxy (options, isOutputVisible) {
-	let {
-		// Get all the options passed to the function
-		remoteServerUrl,
-		inputHarFile,
-		outputHarFile,
-		proxyPort,
-		middlewareList,
-		commandPrefix='proxy',
-		proxyHeaderIdentifier='cached-proxy-playback',
-		cacheBustingParams=[],
-		cacheEverything=false,
-		dataPlayback=true,
-		dataRecord=true
-		} = options;
+/**
+ *
+ *
+ */
+class Bayon {
+	constructor (options) {
+		let defaults = {
+			remoteServerUrl: 'http://localhost:8080',
+			proxyPort: 3001,
+			harObject: null,
+			commandPrefix: 'bayon-proxy',
+			proxyHeaderIdentifier: 'bayon-cache-playback',
+			middlewareList: [],
+			excludedRouteMatchers: [],
+			cacheBustingParams: [],
+			cacheEverything: false,
+			dataPlayback: true,
+			dataRecord: true,
+			showConsoleOutput: false
+		};
 
-	let app = express();
-	let currentWorkingDir = process.cwd();
-	let server, printLog, printError;
+		// Ignore undefined values and combine the options with defaults
+		this.options = Object.assign({},
+			defaults,
+			Object.keys(options).reduce(function (passedOpts, key) {
+				if (options[key] === null || typeof options[key] !== 'undefined') passedOpts[key] = options[key];
+				return passedOpts;
+			}, {}));
 
-	let excludedParamMap = cacheBustingParams.reduce((map, param) => { map[param] = true; return map }, {});
-	let routeCache = {};
+		this.app = express();
+		this.routeCache = {};
 
-	if (isOutputVisible) {
-		printLog = console.log;
-		printError = console.error;
-	} else {
-		printLog = () => false;
-		printError = () => false;
+		this.excludedParamMap = this.options.cacheBustingParams.reduce((map, param) => { map[param] = true; return map }, {});
+
+		if (this.options.showConsoleOutput) {
+			this.log = console.log;
+			this.err = console.error;
+		} else {
+			this.log = () => false;
+			this.err = () => false;
+		}
 	}
 
-	function convertToNameValueList (obj) {
+	convertToNameValueList (obj) {
 		return typeof obj === 'object' ? Object.keys(obj).map(key => { return { name: key, value: obj[key] }; }) : [];
 	}
 
-	function genKeyFromHarReq (harEntryReq, excludedParamMap) {
+	genKeyFromHarReq (harEntryReq) {
 		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
 		let uri = urlUtil.parse(url).pathname;
 		let postParams = postData.text;
 
-		queryString = queryString.filter(param => !excludedParamMap[param.name]);
+		queryString = queryString.filter(param => !this.excludedParamMap[param.name]);
 
 		let plainText = `${method} ${uri} ${JSON.stringify(queryString)} ${postParams}`;
 		let hash = crypto.createHash('md5').update(plainText).digest("hex");
@@ -60,18 +67,18 @@ function jsonCachingProxy (options, isOutputVisible) {
 		return {key, hash};
 	}
 
-	function genKeyFromExpressReq (req, excludedParamMap) {
-		let queryString = convertToNameValueList(req.query);
-		return genKeyFromHarReq({
+	genKeyFromExpressReq (req) {
+		let queryString = this.convertToNameValueList(req.query);
+		return this.genKeyFromHarReq({
 			method: req.method,
 			url: req.url,
 			queryString: queryString,
-			postData: { text: req.body.length > 0 ? req.body.toString('utf8') : '' }
-		}, excludedParamMap);
+			postData: { text: req.body && req.body.length > 0 ? req.body.toString('utf8') : '' }
+		});
 	}
 
 	// Create a HAR from a proxied express request and response
-	function createHarEntry (startedDateTime, req, res, data) {
+	createHarEntry (startedDateTime, req, res, data) {
 		let reqMimeType = req.get('Content-Type');
 		let resMimeType = res.get('Content-Type') || 'text/plain';
 		let encoding = (/^text\/|^application\/(javascript|json)/).test(resMimeType) ? 'utf8' : 'base64';
@@ -81,17 +88,17 @@ function jsonCachingProxy (options, isOutputVisible) {
 				startedDateTime: startedDateTime,
 				method: req.method.toUpperCase(),
 				url: req.url,
-				cookies: convertToNameValueList(req.cookies),
-				headers: convertToNameValueList(req.headers),
-				queryString: convertToNameValueList(req.query),
+				cookies: this.convertToNameValueList(req.cookies),
+				headers: this.convertToNameValueList(req.headers),
+				queryString: this.convertToNameValueList(req.query),
 				headersSize: -1,
 				bodySize: -1
 			},
 			response: {
 				status: res.statusCode,
 				statusText: res.statusMessage,
-				cookies: convertToNameValueList(res.cookies),
-				headers: convertToNameValueList(res._headers).filter(header => header.name.toLowerCase() !== 'content-encoding'), // Not  compressed
+				cookies: this.convertToNameValueList(res.cookies),
+				headers: this.convertToNameValueList(res._headers).filter(header => header.name.toLowerCase() !== 'content-encoding'), // Not  compressed
 				content: {
 					size: -1,
 					mimeType: resMimeType,
@@ -113,200 +120,233 @@ function jsonCachingProxy (options, isOutputVisible) {
 		return entry;
 	}
 
-	// These are not really restful because the GET is changing state. But it's easier to use in a browser
-	app.get(`/${commandPrefix}/playback`, function (req, res) {
-		dataPlayback = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataPlayback;
-		printLog(chalk.blue(`Replay from cache: ${dataPlayback}`));
-		res.send(`Replay from cache: ${dataPlayback}`);
-	});
+	isRouteExcluded (method, uri) {
+		return this.options.excludedRouteMatchers.some(regExp => regExp.test(`${method} ${uri}`))
+	}
 
-	app.get(`/${commandPrefix}/record`, function (req, res) {
-		dataRecord = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : dataRecord;
-		printLog(chalk.blue('Saving to cache: ' + dataRecord));
-		res.send(`Saving to cache: ${dataRecord}`);
-	});
+	addHarEntryRoutes (harObject) {
+		if (harObject) {
+			harObject.log.entries.forEach(entry => {
+				let {key, hash} = this.genKeyFromHarReq(entry.request);
 
-	app.get(`/${commandPrefix}/clear`, function (req, res) {
-		routeCache = {};
-		printLog(chalk.blue('Cleared cache'));
-		res.send('Cleared cache');
-	});
+				if (this.isRouteExcluded(entry.request.method, entry.request.url)) {
+					this.log(chalk.red('Excluded from Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
+					return;
+				}
 
-	app.get(`/${commandPrefix}/har`, function (req, res) {
-		printLog(chalk.blue('Generating har file'));
+				// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
+				if (entry.response.content.text) {
+					let mimeType = entry.response.content.mimeType;
 
-		let har = {
-			log: {
-				version: "1.2",
-				creator: {
-					name: package.name,
-					version: package.version
-				},
-				entries: []
-			}
-		};
+					if (entry.response.headers && (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
+						// Remove content-encoding. gzip compression won't be used
+						entry.response.headers = this.convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
+						this.routeCache[key] = entry;
+						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
+					}
+				}
+			});
+		}
 
-		Object.keys(routeCache).forEach(key => har.log.entries.push(routeCache[key]));
+		return this.routeCache;
+	}
 
-		res.json(har);
-	});
+	addAdminRoutes () {
+		// These are not really restful because the GET is changing state. But it's easier to use in a browser
+		this.app.get(`/${this.options.commandPrefix}/playback`, (req, res) => {
+			this.options.dataPlayback = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : this.options.dataPlayback;
+			this.log(chalk.blue(`Replay from cache: ${this.options.dataPlayback}`));
+			res.send(`Replay from cache: ${this.options.dataPlayback}`);
+		});
+
+		this.app.get(`/${this.options.commandPrefix}/record`, (req, res) => {
+			this.options.dataRecord = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : this.options.dataRecord;
+			this.log(chalk.blue('Saving to cache: ' + this.options.dataRecord));
+			res.send(`Saving to cache: ${this.options.dataRecord}`);
+		});
+
+		this.app.get(`/${this.options.commandPrefix}/clear`, (req, res) => {
+			this.routeCache = {};
+			this.log(chalk.blue('Cleared cache'));
+			res.send('Cleared cache');
+		});
+
+		this.app.get(`/${this.options.commandPrefix}/har`, (req, res) => {
+			this.log(chalk.blue('Generating har file'));
+
+			let har = {
+				log: {
+					version: "1.2",
+					creator: {
+						name: npmPackage.name,
+						version: npmPackage.version
+					},
+					entries: []
+				}
+			};
+
+			Object.keys(this.routeCache).forEach(key => har.log.entries.push(this.routeCache[key]));
+
+			res.json(har);
+		});
+
+		return this.app;
+	}
 
 	// User supplied middleware to handle special cases (browser-sync middleware options)
-	if (middlewareList && middlewareList.length > 0) {
-		middlewareList.forEach((mw) => {
+	addMiddleWareRoutes (middlewareList) {
+		middlewareList.forEach(mw => {
 			if (mw.route) {
-				app.use(mw.route, mw.handle);
+				this.app.use(mw.route, mw.handle);
 			} else {
-				app.use(mw.handle);
+				this.app.use(mw.handle);
 			}
 		});
+
+		return this.app;
 	}
 
-	if (inputHarFile) {
-		let harObject = JSON.parse(fs.readFileSync(inputHarFile, "utf8"));
-		harObject.log.entries.forEach(function (entry) {
-			let {key, hash} = genKeyFromHarReq(entry.request, excludedParamMap);
+	addBodyParser () {
+		this.app.use(bodyParser.raw({type: '*/*'}));
 
-			// Only cache things that have content. Some times HAR files generated elsewhere will be missing this parameter
-			if (entry.response.content.text) {
-				let mimeType = entry.response.content.mimeType;
-
-				if (entry.response.headers && (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
-					// Remove content-encoding. gzip compression won't be used
-					entry.response.headers = convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
-					routeCache[key] = entry;
-					printLog(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.url)));
-				}
+		// Remove the body if there is no body content. Some sites check for malformed requests
+		this.app.use((req, res, next) => {
+			if (!req.headers['content-length']) {
+				delete req.body;
 			}
-		});
-	}
 
-	app.use(bodyParser.raw({type: '*/*'}));
+			next();
+		});
+
+		return this.app;
+	}
 
 	// Read from the cache if possible for any routes not being handled by previous middleware
-	app.use('/', function (req, res, next) {
-		if (!dataPlayback) {
-			next();
-		} else {
-			let {key, hash} = genKeyFromExpressReq(req, excludedParamMap);
-			let entry = routeCache[key];
-
-			if (!(entry && entry.response && entry.response.content)) {
+	addCachingRoute () {
+		this.app.use('/', (req, res, next) => {
+			if (!this.options.dataPlayback) {
 				next();
 			} else {
-				let response = entry.response;
-				let headerList = response.headers || [];
-				let text = response.content.text || '';
-				let encoding = response.content.encoding || 'utf8';
+				let {key, hash} = this.genKeyFromExpressReq(req);
+				let entry = this.routeCache[key];
 
-				headerList.forEach(function (header) {
-					res.set(header.name, header.value);
-				});
-
-				// TODO: Handle redirects properly
-				if (text.length === 0) {
-					res.sendStatus(response.status);
+				if (!(entry && entry.response && entry.response.content)) {
+					next();
 				} else {
-					if (encoding === 'base64') {
-						let bin = new Buffer(text, 'base64');
-						res.writeHead(response.status, {
-							'Content-Type': response.content.mimeType,
-							'Content-Length': bin.length
-						});
-						res.end(bin);
+					let response = entry.response;
+					let headerList = response.headers || [];
+					let text = response.content.text || '';
+					let encoding = response.content.encoding || 'utf8';
+
+					headerList.forEach(function (header) {
+						res.set(header.name, header.value);
+					});
+
+					// TODO: Handle redirects properly
+					if (text.length === 0) {
+						res.sendStatus(response.status);
 					} else {
-						res.status(response.status);
-						res.type(response.content.mimeType);
-						res.send(text);
+						if (encoding === 'base64') {
+							let bin = new Buffer(text, 'base64');
+							res.writeHead(response.status, {
+								'Content-Type': response.content.mimeType,
+								'Content-Length': bin.length
+							});
+							res.end(bin);
+						} else {
+							res.status(response.status);
+							res.type(response.content.mimeType);
+							res.send(text);
+						}
+					}
+
+					this.log(chalk.green('Reading From Cache', hash, chalk.bold(entry.request.url)));
+				}
+
+			}
+		});
+
+		return this.app;
+	}
+
+	// Handle the proxy response by writing the response to cache if possible and altering location redirects if needed
+	addProxyRoute () {
+		this.app.use('/', proxy(this.options.remoteServerUrl, {
+			//proxyReqBodyDecorator: (body, req) => {
+			//	this.log(req.headers['content-length']);
+			//	if (!req.headers['content-length']) {
+			//		return [];
+			//	}
+			//
+			//	return body;
+			//},
+
+			userResDecorator: (rsp, rspData, req, res) => {
+				if (!this.options.dataRecord) {
+					this.log(chalk.gray('Proxied Resource', req.path));
+				} else {
+
+					// Handle Redirects
+					let location = res.get('location');
+					if (location) {
+						res.location(urlUtil.parse(location).path);
+					}
+
+					let mimeType = res._headers['content-type'];
+
+					if (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
+						let {key, hash} = this.genKeyFromExpressReq(req);
+						let entry = this.createHarEntry(new Date().toISOString(), req, res, rspData);
+						this.routeCache[key] = entry;
+						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.url)));
+					} else {
+						this.log(chalk.gray('Proxied Resource', req.path));
 					}
 				}
 
-				printLog(chalk.green('Reading From Cache', hash, chalk.bold(entry.request.url)));
+				return rspData;
 			}
+		}));
 
-		}
-	});
+		return this.app;
+	}
 
-	// Handle the proxy response by writing the response to cache if possible and altering location redirects if needed
-	app.use('/', proxy(remoteServerUrl, {
-		userResDecorator: function (rsp, rspData, req, res) {
-			if (!dataRecord) {
-				printLog(chalk.gray('Proxied Resource', req.path));
-			} else {
+	start () {
+		let server = this.app.listen(this.options.proxyPort);
 
-				let location = res.get('location');
-				if (location) {
-					// Handle Redirects
-					res.location(urlUtil.parse(location).path);
-				}
+		this.log(chalk.bold(`\nBayon Started:`));
+		this.log(chalk.gray(`==============\n`));
+		this.log(`Remote server url: \t${chalk.bold(this.options.remoteServerUrl)}`);
+		this.log(`Proxy running on port: \t${chalk.bold(this.options.proxyPort)}`);
+		this.log(`Replay cache: \t\t${chalk.bold(this.options.dataPlayback)}`);
+		this.log(`Save to cache: \t\t${chalk.bold(this.options.dataRecord)}`);
+		this.log(`Command prefix: \t${chalk.bold(this.options.commandPrefix)}`);
+		this.log(`Proxy response header: \t${chalk.bold(this.options.proxyHeaderIdentifier)}`);
+		this.log(`Cache all: \t\t${chalk.bold(this.options.cacheEverything)}`);
+		this.log(`Cache busting params: \t${chalk.bold(this.options.cacheBustingParams)}`);
+		this.log(`Excluded routes: `);
+		this.options.excludedRouteMatchers.forEach((regExp) => {
+			this.log(`\t\t\t${chalk.bold(regExp)}`)
+		});
 
-				let mimeType = res._headers['content-type'];
+		this.log('\nListening...\n');
 
-				if (cacheEverything || !cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
-					let {key, hash} = genKeyFromExpressReq(req, excludedParamMap);
-					let entry = createHarEntry(new Date().toISOString(), req, res, rspData);
-					routeCache[key] = entry;
-					printLog(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.url)));
-				} else {
-					printLog(chalk.gray('Proxied Resource', req.path));
-				}
-			}
+		// The order of these routes is important
+		this.addHarEntryRoutes(this.options.harObject);
+		this.addAdminRoutes();
+		this.addMiddleWareRoutes(this.options.middlewareList);
+		this.addBodyParser();
+		this.addCachingRoute();
+		this.addProxyRoute();
 
-			return rspData;
-		}
-	}));
-
-	return {
-		start: function () {
-			server = app.listen(proxyPort);
-			printLog(chalk.bold(`\nStarting Proxy Server:`));
-			printLog(chalk.gray(`======================\n`));
-
-			printLog(`Remote Server URL: ${chalk.bold(remoteServerUrl)}`);
-			printLog(`Proxy running on port: ${chalk.bold(proxyPort)}`);
-
-			inputHarFile && printLog(`HAR input: ${chalk.bold(path.join(currentWorkingDir, inputHarFile))}`);
-			outputHarFile && printLog(`HAR output: ${chalk.bold(path.join(currentWorkingDir, outputHarFile))}`);
-
-			printLog(`Replay cache: ${chalk.bold(dataPlayback)}`);
-			printLog(`Save to cache: ${chalk.bold(dataRecord)}`);
-			printLog(`Command prefix: ${chalk.bold(commandPrefix)}`);
-			printLog(`Proxy response header: ${chalk.bold(proxyHeaderIdentifier)}`);
-			printLog(`Try to cache all responses: ${chalk.bold(cacheEverything)}`);
-
-			cacheBustingParams.length > 0 && printLog(`Ignoring query parameters: ${chalk.bold(cacheBustingParams)}`);
-
-			printLog('\n');
-
-			return app;
-		},
-
-		stop: function () {
+		return () => {
 			if (server) {
 				server.close();
-				printLog(chalk.bold('\nStopping Proxy Server'));
+				this.log(chalk.bold('\nStopping Proxy Server'));
 			}
-		},
+		};
 
-		getServer: function () {
-			return server;
-		},
-
-		getExpressApp: function () {
-			return app;
-		},
-
-		isReplaying: function () {
-			return dataPlayback
-		},
-
-		isRecording: function () {
-			return dataRecord;
-		}
 	}
 }
 
-module.exports = jsonCachingProxy;
-
-
-
+module.exports = Bayon;
