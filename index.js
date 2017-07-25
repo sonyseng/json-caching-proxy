@@ -9,6 +9,7 @@ const chalk = require('chalk');
 /** The caching proxy server. */
 class JsonCachingProxy {
 	/**
+	 * Ctor
 	 * @param {Object} options - Options passed into the ctor will override defaults if defined
 	 */
 	constructor (options) {
@@ -35,6 +36,7 @@ class JsonCachingProxy {
 				return passedOpts;
 			}, {}));
 
+		this.server = null; // Will be set when the app starts
 		this.app = express();
 		this.routeCache = {};
 
@@ -61,7 +63,7 @@ class JsonCachingProxy {
 	/**
 	 * Generate a unique hash key from a har file entry's request object
 	 * @param {Object} harEntryReq - HAR request object
-	 * @returns {string} A unique key that identifies the request
+	 * @returns {Object} A unique key, hash tuple that identifies the request
 	 */
 	genKeyFromHarReq (harEntryReq) {
 		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
@@ -80,7 +82,7 @@ class JsonCachingProxy {
 	/**
 	 * Takes a generic express request and convert it into a HAR request so that a unique key can be generated
 	 * @param {Object} req - An express IncomingMessage request
-	 * @returns {string} A unique key that identifies the request
+	 * @returns {string} A unique hash key that identifies the request
 	 */
 	genKeyFromExpressReq (req) {
 		let queryString = this.convertToNameValueList(req.query);
@@ -156,7 +158,7 @@ class JsonCachingProxy {
 	/**
 	 * Add express routes for each entry in a harObject. The harObject would have been read in from a har file at some point
 	 * @param {Object} harObject - A standard HAR file object that contains a collection of entries
-	 * @returns {Object[]} routeCache - The populated collection of routes that are identified by its request hash key
+	 * @returns {JsonCachingProxy}
 	 */
 	addHarEntryRoutes (harObject) {
 		if (harObject) {
@@ -182,13 +184,13 @@ class JsonCachingProxy {
 			});
 		}
 
-		return this.routeCache;
+		return this;
 	}
 
 	/**
 	 * Add the admin express routes for controlling the proxy server through a browser. Allows one to make GET requests to clear
 	 * the cache, disable/enable playback/recording, and generate a har file of the cache to download for later use.
-	 * @returns {Object} The express application
+	 * @returns {JsonCachingProxy}
 	 */
 	addAdminRoutes () {
 		// These are not really restful because the GET is changing state. But it's easier to use in a browser
@@ -229,13 +231,13 @@ class JsonCachingProxy {
 			res.json(har);
 		});
 
-		return this.app;
+		return this;
 	}
 
 	/**
-	 *  Add user supplied middleware routes to express in order to handle special cases (browser-sync middleware options)
-	 *  @param {Object[]} middlewareList - A list of route/handler pairs
-	 *  @returns {Object} the express application
+	 * Add user supplied middleware routes to express in order to handle special cases (browser-sync middleware options)
+	 * @param {Object[]} middlewareList - A list of route/handler pairs
+	 * @returns {JsonCachingProxy}
 	 */
 	addMiddleWareRoutes (middlewareList) {
 		middlewareList.forEach(mw => {
@@ -246,12 +248,12 @@ class JsonCachingProxy {
 			}
 		});
 
-		return this.app;
+		return this;
 	}
 
 	/**
 	 * Add Request body parsing into RAW if there is actual body content
-	 * @returns {Object} The express application
+	 * @returns {JsonCachingProxy}
 	 */
 	addBodyParser () {
 		this.app.use(bodyParser.raw({type: '*/*'}));
@@ -265,14 +267,13 @@ class JsonCachingProxy {
 			next();
 		});
 
-		return this.app;
+		return this;
 	}
 
 	/**
 	 * An express route that reads from the cache if possible for any routes persisted in cache memory
 	 * Makes sure to modify redirect urls so that the hostname matches the proxy server host name.
-	 *
-	 * @returns {Object} The express application
+	 * @returns {JsonCachingProxy}
 	 */
 	addCachingRoute () {
 		this.app.use('/', (req, res, next) => {
@@ -318,13 +319,12 @@ class JsonCachingProxy {
 			}
 		});
 
-		return this.app;
+		return this;
 	}
 
 	/**
-	 * If the request has gotten this far, make the actual proxy request to the target server and cache the response
-	 *
-	 * @returns {Object} The express application
+	 * Add the proxy route that makes the actual request to the target server and cache the response when it comes back
+	 * @returns {JsonCachingProxy}
 	 */
 	addProxyRoute () {
 		this.app.use('/', proxy(this.options.remoteServerUrl, {
@@ -355,16 +355,15 @@ class JsonCachingProxy {
 			}
 		}));
 
-		return this.app;
+		return this;
 	}
 
 	/**
 	 * Start the server and generate any log output if needed
-	 *
-	 * @returns {Function} Stops the server when called
+	 * @returns {JsonCachingProxy}
 	 */
 	start () {
-		let server = this.app.listen(this.options.proxyPort);
+		this.server = this.app.listen(this.options.proxyPort);
 
 		this.log(chalk.bold(`\nBayon Started:`));
 		this.log(chalk.gray(`==============\n`));
@@ -391,14 +390,26 @@ class JsonCachingProxy {
 		this.addCachingRoute();
 		this.addProxyRoute();
 
-		return () => {
-			if (server) {
-				server.close();
-				this.log(chalk.bold('\nStopping Proxy Server'));
-			}
-		};
-
+		return this;
 	}
+
+	/**
+	 * Stops the proxy server
+	 * @returns {JsonCachingProxy}
+	 */
+	stop () {
+		if (server) {
+			server.close();
+			this.log(chalk.bold('\nStopping Proxy Server'));
+		}
+
+		return this;
+	}
+
+	getOptions () { return this.options; }
+	getApp () { return this.app; }
+	getRouteCache () { return this.routeCache; }
+	getExcludedParamMap () { return this.excludedParamMap; }
 }
 
 module.exports = JsonCachingProxy;
