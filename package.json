@@ -2,7 +2,7 @@
   "name": "json-caching-proxy",
   "version": "1.2.0",
   "scripts": {
-    "test": "mocha ./*.spec.js",
+    "test": "mocha ./test/*.spec.js",
     "jsdoc": "jsdoc ./*.js -d ./jsdoc"
   },
   "repository": {

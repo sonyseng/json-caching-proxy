@@ -9,11 +9,10 @@ const chalk = require('chalk');
 /** The caching proxy server. */
 class JsonCachingProxy {
 	/**
-	 * Ctor
 	 * @param {Object} options - Options passed into the ctor will override defaults if defined
 	 */
-	constructor (options) {
-		let defaults = {
+	constructor (options={}) {
+		this.defaultOptions = {
 			remoteServerUrl: 'http://localhost:8080',
 			proxyPort: 3001,
 			harObject: null,
@@ -30,13 +29,15 @@ class JsonCachingProxy {
 
 		// Ignore undefined values and combine the options with defaults
 		this.options = Object.assign({},
-			defaults,
+			this.defaultOptions,
 			Object.keys(options).reduce(function (passedOpts, key) {
-				if (options[key] === null || typeof options[key] !== 'undefined') passedOpts[key] = options[key];
+				if (typeof options[key] !== 'undefined' && options[key] !== null) passedOpts[key] = options[key];
 				return passedOpts;
 			}, {}));
 
-		this.server = null; // Will be set when the app starts
+		// Will be set when the app starts
+		this.server = null;
+
 		this.app = express();
 		this.routeCache = {};
 
@@ -61,7 +62,7 @@ class JsonCachingProxy {
 	}
 
 	/**
-	 * Generate a unique hash key from a har file entry's request object
+	 * Generate a unique hash key from a har file entry's request object: TODO: Include headers?
 	 * @param {Object} harEntryReq - HAR request object
 	 * @returns {Object} A unique key, hash tuple that identifies the request
 	 */
@@ -85,12 +86,11 @@ class JsonCachingProxy {
 	 * @returns {string} A unique hash key that identifies the request
 	 */
 	genKeyFromExpressReq (req) {
-		let queryString = this.convertToNameValueList(req.query);
 		return this.genKeyFromHarReq({
 			method: req.method,
 			url: req.url,
-			queryString: queryString,
-			postData: { text: req.body && req.body.length > 0 ? req.body.toString('utf8') : '' }
+			queryString: this.convertToNameValueList(req.query),
+			postData: {text: req.body && req.body.length > 0 ? req.body.toString('utf8') : ''}
 		});
 	}
 
@@ -166,7 +166,7 @@ class JsonCachingProxy {
 				let {key, hash} = this.genKeyFromHarReq(entry.request);
 
 				if (this.isRouteExcluded(entry.request.method, entry.request.url)) {
-					this.log(chalk.red('Excluded from Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
+					this.log(chalk.red('Excluded from Cache', chalk.bold(entry.request.method, entry.request.url)));
 					return;
 				}
 
@@ -178,6 +178,7 @@ class JsonCachingProxy {
 						// Remove content-encoding. gzip compression won't be used
 						entry.response.headers = this.convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
 						this.routeCache[key] = entry;
+
 						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
 					}
 				}
@@ -272,7 +273,6 @@ class JsonCachingProxy {
 
 	/**
 	 * An express route that reads from the cache if possible for any routes persisted in cache memory
-	 * Makes sure to modify redirect urls so that the hostname matches the proxy server host name.
 	 * @returns {JsonCachingProxy}
 	 */
 	addCachingRoute () {
@@ -323,31 +323,31 @@ class JsonCachingProxy {
 	}
 
 	/**
-	 * Add the proxy route that makes the actual request to the target server and cache the response when it comes back
+	 * Add the proxy route that makes the actual request to the target server and cache the response when it comes back.
+	 * Modifies locations on redirects.
 	 * @returns {JsonCachingProxy}
 	 */
 	addProxyRoute () {
 		this.app.use('/', proxy(this.options.remoteServerUrl, {
 			userResDecorator: (rsp, rspData, req, res) => {
-				if (!this.options.dataRecord) {
-					this.log(chalk.gray('Proxied Resource', req.path));
+				// Handle Redirects by modifying the location property of the response header
+				let location = res.get('location');
+				if (location) {
+					res.location(urlUtil.parse(location).path);
+				}
+
+				if (this.isRouteExcluded(req.method, req.url)) {
+					this.log(chalk.red('Exclude Proxied Resource', chalk.bold(req.method, req.url)));
 				} else {
-
-					// Handle Redirects
-					let location = res.get('location');
-					if (location) {
-						res.location(urlUtil.parse(location).path);
-					}
-
 					let mimeType = res._headers['content-type'];
 
-					if (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0) {
+					if (this.options.dataRecord && (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
 						let {key, hash} = this.genKeyFromExpressReq(req);
 						let entry = this.createHarEntry(new Date().toISOString(), req, res, rspData);
 						this.routeCache[key] = entry;
-						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.url)));
+						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
 					} else {
-						this.log(chalk.gray('Proxied Resource', req.path));
+						this.log(chalk.gray('Proxied Resource', chalk.bold(req.method, req.url)));
 					}
 				}
 
@@ -365,7 +365,7 @@ class JsonCachingProxy {
 	start () {
 		this.server = this.app.listen(this.options.proxyPort);
 
-		this.log(chalk.bold(`\nBayon Started:`));
+		this.log(chalk.bold(`\JSON Caching Proxy Started:`));
 		this.log(chalk.gray(`==============\n`));
 		this.log(`Remote server url: \t${chalk.bold(this.options.remoteServerUrl)}`);
 		this.log(`Proxy running on port: \t${chalk.bold(this.options.proxyPort)}`);
@@ -398,8 +398,8 @@ class JsonCachingProxy {
 	 * @returns {JsonCachingProxy}
 	 */
 	stop () {
-		if (server) {
-			server.close();
+		if (this.server) {
+			this.server.close();
 			this.log(chalk.bold('\nStopping Proxy Server'));
 		}
 
@@ -407,7 +407,9 @@ class JsonCachingProxy {
 	}
 
 	getOptions () { return this.options; }
+	getDefaultOptions () { return this.defaultOptions; }
 	getApp () { return this.app; }
+	getServer () { return this.server; }
 	getRouteCache () { return this.routeCache; }
 	getExcludedParamMap () { return this.excludedParamMap; }
 }
