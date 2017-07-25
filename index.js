@@ -134,11 +134,11 @@ class JsonCachingProxy {
 			}
 		};
 
-		if (req.postData && req.postData.length > 0) {
+		if (req.body && req.body.length > 0) {
 			entry.request.postData = {
 				mimeType: reqMimeType,
-				text: req.postData.toString(encoding)
-			}
+				text: req.body.toString(encoding)
+			};
 		}
 
 		return entry;
@@ -313,7 +313,7 @@ class JsonCachingProxy {
 						}
 					}
 
-					this.log(chalk.green('Reading From Cache', hash, chalk.bold(entry.request.url)));
+					this.log(chalk.green('Reading From Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
 				}
 
 			}

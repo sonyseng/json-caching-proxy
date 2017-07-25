@@ -160,8 +160,20 @@ describe('JSON-caching-proxy', () => {
       assert.notEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data changes the hash');
       req.body = 'Original';
       assert.equal(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data back should generate the same hash');
-
     });
+
+    it('genKeyFromExpressReq - create a unique md5 hash from an express request (IncomingMessage)', () => {
+      let req = {
+        query: {param1: 1, param2: 2, param3: 'three'},
+        cookies: {cookie1: 1, cookie2: 2, cookie3: 'three'},
+        headers: {header1: 1, header2: 2, header3: 'three'},
+        method: 'GET',
+        url: 'http://sleepy:3001/',
+        body: 'Original',
+        'get': () => 'application/json'
+      };
+    });
+
   });
 
   //it('proxies and caches JSON', done => {
