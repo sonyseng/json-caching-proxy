@@ -134,6 +134,7 @@ class JsonCachingProxy {
 			}
 		};
 
+		// Add the request body if it exists
 		if (req.body && req.body.length > 0) {
 			entry.request.postData = {
 				mimeType: reqMimeType,
@@ -160,7 +161,7 @@ class JsonCachingProxy {
 	 * @param {Object} harObject - A standard HAR file object that contains a collection of entries
 	 * @returns {JsonCachingProxy}
 	 */
-	addHarEntryRoutes (harObject) {
+	addHarEntriesToCache (harObject) {
 		if (harObject) {
 			harObject.log.entries.forEach(entry => {
 				let {key, hash} = this.genKeyFromHarReq(entry.request);
@@ -295,7 +296,9 @@ class JsonCachingProxy {
 						res.set(header.name, header.value);
 					});
 
-					// TODO: Handle redirects properly
+					// Use our header identifier to signal that this response is cached
+					res.set(this.options.proxyHeaderIdentifier, true);
+
 					if (text.length === 0) {
 						res.sendStatus(response.status);
 					} else {
@@ -315,7 +318,6 @@ class JsonCachingProxy {
 
 					this.log(chalk.green('Reading From Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
 				}
-
 			}
 		});
 
@@ -360,9 +362,10 @@ class JsonCachingProxy {
 
 	/**
 	 * Start the server and generate any log output if needed
+	 * @param {Function} call back fn executed after the server has started
 	 * @returns {JsonCachingProxy}
 	 */
-	start () {
+	start (onStarted) {
 		this.server = this.app.listen(this.options.proxyPort);
 
 		this.log(chalk.bold(`\JSON Caching Proxy Started:`));
@@ -383,12 +386,14 @@ class JsonCachingProxy {
 		this.log('\nListening...\n');
 
 		// The order of these routes is important
-		this.addHarEntryRoutes(this.options.harObject);
+		this.addHarEntriesToCache(this.options.harObject);
 		this.addAdminRoutes();
 		this.addMiddleWareRoutes(this.options.middlewareList);
 		this.addBodyParser();
 		this.addCachingRoute();
 		this.addProxyRoute();
+
+		onStarted && onStarted();
 
 		return this;
 	}
@@ -410,8 +415,11 @@ class JsonCachingProxy {
 	getDefaultOptions () { return this.defaultOptions; }
 	getApp () { return this.app; }
 	getServer () { return this.server; }
-	getRouteCache () { return this.routeCache; }
 	getExcludedParamMap () { return this.excludedParamMap; }
+	getTotalCachedRoutes () { return Object.keys(this.routeCache).length; }
+	isRouteCacheEmpty () { return this.getTotalCachedRoutes() === 0; }
+	isReplaying () { return this.options.dataPlayback; }
+	isRecording () { return this.options.dataRecord; }
 }
 
 module.exports = JsonCachingProxy;
