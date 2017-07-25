@@ -2,7 +2,8 @@
   "name": "bayon",
   "version": "0.0.1",
   "scripts": {
-    "test": "node node_modules/mocha/bin/mocha ./*.spec.js"
+    "test": "mocha ./*.spec.js",
+    "jsdoc": "jsdoc ./*.js -d ./jsdoc"
   },
   "repository": {
     "type": "git",
