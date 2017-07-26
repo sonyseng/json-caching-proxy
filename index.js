@@ -230,6 +230,8 @@ class JsonCachingProxy {
 
 			Object.keys(this.routeCache).forEach(key => har.log.entries.push(this.routeCache[key]));
 
+			res.setHeader('Content-disposition', 'attachment; filename=json-caching-proxy.har');
+			res.setHeader('Content-type', 'application/json');
 			res.json(har);
 		});
 

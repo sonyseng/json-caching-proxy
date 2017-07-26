@@ -1,5 +1,5 @@
 # json-caching-proxy [![Build Status](https://travis-ci.org/sonyseng/json-caching-proxy.svg?branch=master)](https://travis-ci.org/sonyseng/json-caching-proxy) [![NPM Version](http://img.shields.io/npm/v/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy) [![NPM Downloads](https://img.shields.io/npm/dm/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy)
-NodeJs Server that caches requests and responses to memory in a HAR-like data structure. Supports JSON content as well as binary data such as images.
+NodeJs proxy built on top of [express-http-proxy](https://github.com/villadora/express-http-proxy) that caches requests and responses to memory in a [HAR-like](http://www.softwareishard.com/blog/har-12-spec/) data structure. Supports JSON content as well as binary data such as images.
 
 ## Installation
 
@@ -78,8 +78,8 @@ json-caching-proxy --config config.js
 
 ### Controlling the Proxy once it's running using HTTP GET requests
 ```
-* http://localhost:3001/proxy/playback?enabled=`[true|false]` - Start/Stop replaying persisted JSON from the cache.
-* http://localhost:3001/proxy/record?enabled=`[true|false]` - Start/Stop recording JSON to file system.
+* http://localhost:3001/proxy/playback?enabled=[true|false] - Start/Stop replaying persisted JSON from the cache.
+* http://localhost:3001/proxy/record?enabled=[true|false] - Start/Stop recording JSON to file system.
 * http://localhost:3001/proxy/clear - The HAR data structure that is the in-memory cache will be emptied
 * http://localhost:3001/proxy/har - Download the cache into a HAR json file
 ```
