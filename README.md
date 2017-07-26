@@ -52,7 +52,7 @@ $ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -h
 
 #### Example - loading a config file
 
-The example below will load the options from a config.json file that may look like this:
+The example below will load the options from a `config.json` file that may look like this:
 
 ```js
 // Complete list of config.json options for the caching proxy
@@ -74,7 +74,7 @@ The example below will load the options from a config.json file that may look li
 $ json-caching-proxy --config config.js
 ```
 
-#### Example - print log to the console
+#### Example - print log output to the console
 Setting the `showConsoleOut` value to `true` will start showing the requests being made through the proxy. If the request is cacheable, it will also show the hash key for each request:
 
 ![Console output](http://sonyseng.github.io/json-caching-proxy/images/caching-proxy1.png)
@@ -108,7 +108,7 @@ jsonCachingProxy.start();
 ```
 
 #### Example - passing in a HAR object
-If you have a method of generating a HAR object. The proxy can load the HAR entries and hydrate the cache. The proxy has a commandline
+If you have a method of generating a HAR object, the proxy can load the HAR entries and hydrate the cache. The proxy has a commandline
 utility for loading HAR files but you may want to load your own or modify the objects before passing them into the proxy. More info can be found
 here: [HAR 1.2 spec](http://www.softwareishard.com/blog/har-12-spec/)
 
@@ -176,7 +176,7 @@ let harObject = {
 ```
 
 #### Example - using special middleware
-Bypasses the remote server and allow your own middleware to be executed:
+Bypasses the remote server and allows your own middleware to be executed:
 ```js
 let middlewareList = [
   { route: '/what', handle: (req, res, next) => res.send('what') },
@@ -185,7 +185,7 @@ let middlewareList = [
 ```
 
 #### Example - excluding specific routes
-You can specify a list of regular expressions to match against. Currently supports matching against the method and the uri:
+You can specify a list of regular expressions to match against. Currently supports matching against the `method` and `uri`:
 ```js
 excludedRouteMatchers: [new RegExp('/site/*.js'), new RegExp('GET /site/*.gif'), new RegExp('POST /account/666')]
 ```
@@ -201,10 +201,10 @@ cacheBustingParams: ['time', 'dc', 'cacheSlayer', '_']
 ## Controlling the Proxy
 Once the proxy has started, you may point your browser to the following urls to affect the state of the proxy:
 ```
-http://localhost:3001/proxy/playback?enabled=[true|false] - Start/Stop replaying persisted JSON from the cache.
-http://localhost:3001/proxy/record?enabled=[true|false] - Start/Stop recording JSON to file system.
+http://localhost:3001/proxy/playback?enabled=[true|false] - Start/Stop replaying cached requests.
+http://localhost:3001/proxy/record?enabled=[true|false] - Start/Stop recording request/responses to the cache.
 http://localhost:3001/proxy/clear - The HAR data structure that is the in-memory cache will be emptied
-http://localhost:3001/proxy/har - Download the cache as a HAR json file. The file weill be named json-caching-proxy.har
+http://localhost:3001/proxy/har - Download the cache as a HAR json file. The file will be named json-caching-proxy.har
 ```
 
 ## License
