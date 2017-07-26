@@ -33,9 +33,9 @@ program
 	.option('-e, --exclude [regex]', 'Exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
 	.option('-a, --all', 'Try to cache everything in addition to JSON (Overrided by --exclude argument)')
 	.option('-dp, --playback', 'Disable cache playback')
-	.option('-dr, --record', 'Disable caching')
-	.option('-cp, --prefix', 'Prefix for controlling proxy')
-	.option('-phi, --header', 'Prefix for controlling proxy')
+	.option('-dr, --record', 'Disable recording to cache')
+	.option('-cp, --prefix', 'Prefix for controlling proxy admin control thru HTTP')
+	.option('-phi, --header', 'Specify a proxy header property for identifying cached responses')
 	.option('-l, --log', 'Show log output to console')
 	.parse(process.argv);
 

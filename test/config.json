@@ -1,3 +1,7 @@
+/**
+* Complete list of config.json options for the caching proxy
+*/
+
 {
   "remoteServerUrl": "http://wikimapia.org",
   "proxyPort": 3001,
