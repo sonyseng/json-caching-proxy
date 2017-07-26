@@ -1,5 +1,4 @@
-# json-caching-proxy
-
+# json-caching-proxy [![Build Status](https://travis-ci.org/sonyseng/json-caching-proxy.svg?branch=master)](https://travis-ci.org/sonyseng/json-caching-proxy) [![NPM Version](http://img.shields.io/npm/v/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy) [![NPM Downloads](https://img.shields.io/npm/dm/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy)
 NodeJs Server that caches requests and responses to memory in a HAR-like data structure. Supports JSON content as well as binary data such as images.
 
 ## Installation
