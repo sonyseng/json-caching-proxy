@@ -1,29 +1,35 @@
 {
   "name": "json-caching-proxy",
-  "version": "1.0.8",
+  "version": "1.2.0",
+  "description": "In memory caching proxy",
+  "keywords": [
+    "cache",
+    "proxy",
+    "json"
+  ],
   "scripts": {
-    "test": "node node_modules/mocha/bin/mocha ./*.spec.js"
+    "test": "mocha ./test/*.spec.js",
+    "jsdoc": "jsdoc ./*.js -d ./jsdoc"
   },
   "repository": {
-    "type" : "git",
-    "url" : "https://github.com/sonyseng/json-caching-proxy.git"
+    "type": "git",
+    "url": "https://github.com/sonyseng/json-caching-proxy.git"
   },
   "author": "Sony Seng",
   "license": "MIT",
   "main": "index.js",
   "bin": "bin.js",
   "dependencies": {
-    "express": "^4.14.1",
-    "express-http-proxy": "^0.11.0",
+    "body-parser": "^1.17.2",
+    "chalk": "^1.1.3",
     "commander": "^2.9.0",
-    "mkdirp": "^0.5.1",
-    "request": "^2.79.0",
-    "rimraf": "^2.5.4",
-    "chalk": "^1.1.3"
+    "express": "^4.14.1",
+    "express-http-proxy": "^1.0.5",
+    "strip-json-comments": "^2.0.1"
   },
   "devDependencies": {
+    "jsdoc": "^3.5.3",
     "mocha": "^3.3.0",
-    "mock-fs": "^4.3.0",
     "node-fetch": "^1.6.3"
   }
 }

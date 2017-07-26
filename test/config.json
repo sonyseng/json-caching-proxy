@@ -1,0 +1,17 @@
+/**
+* Complete list of config.json options for the caching proxy
+*/
+
+{
+  "remoteServerUrl": "http://wikimapia.org",
+  "proxyPort": 3001,
+  "inputHarFile": "./test/test.har",
+  "cacheEverything": true,
+  "cacheBustingParams": ["_", "dc", "cacheSlayer"],
+  "excludedRouteMatchers": ["/*.js", "/*.png"],
+  "showConsoleOutput": true,
+  "dataPlayback": true,
+  "dataRecord": true,
+  "commandPrefix": "proxy",
+  "proxyHeaderIdentifier": "proxy-cache-playback"
+}
