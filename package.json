@@ -1,6 +1,12 @@
 {
   "name": "json-caching-proxy",
   "version": "1.2.0",
+  "description": "In memory caching proxy",
+  "keywords": [
+    "cache",
+    "proxy",
+    "json"
+  ],
   "scripts": {
     "test": "mocha ./test/*.spec.js",
     "jsdoc": "jsdoc ./*.js -d ./jsdoc"
