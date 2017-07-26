@@ -413,14 +413,58 @@ class JsonCachingProxy {
 		return this;
 	}
 
+	/**
+	 * Returns the options passed into the proxy
+	 * @returns {Object}
+	 */
 	getOptions () { return this.options; }
+
+	/**
+	 * Returns the default options that are used when no options are passed in
+	 * @returns {Object}
+	 */
 	getDefaultOptions () { return this.defaultOptions; }
+
+	/**
+	 * Returns the Express App
+	 * @returns {Object}
+	 */
 	getApp () { return this.app; }
+
+	/**
+	 * Returns the Node server object
+	 * @returns {Object}
+	 */
 	getServer () { return this.server; }
+
+	/**
+	 * Returns the key value map of all the excluded params
+	 * @returns {Object}
+	 */
 	getExcludedParamMap () { return this.excludedParamMap; }
+
+	/**
+	 * Count of total cached routes in memory
+	 * @returns {number}
+	 */
 	getTotalCachedRoutes () { return Object.keys(this.routeCache).length; }
+
+	/**
+	 * Determines if we have anything in the cache
+	 * @returns {boolean}
+	 */
 	isRouteCacheEmpty () { return this.getTotalCachedRoutes() === 0; }
+
+	/**
+	 * Is the server sending us cached responses
+	 * @returns {boolean}
+	 */
 	isReplaying () { return this.options.dataPlayback; }
+
+	/**
+	 * Is the server saving to the cache
+	 * @returns {JsonCachingProxy}
+	 */
 	isRecording () { return this.options.dataRecord; }
 }
 

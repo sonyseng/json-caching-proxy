@@ -25,18 +25,18 @@ function def (valToCheck, defaultVal, isBoolean=true) {
 
 program
 	.version(version)
-	.option('-c, --config [path]', 'Load a config file of options. (Command line args will be overridden')
-	.option('-u, --url [url]', 'Remote server to proxy (e.g. https://network:8080)')
-	.option('-p, --port [number]', 'Port for the local proxy server', parseInt)
-	.option('-h, --har [path]', 'Load entries from a HAR file and hydrate the cache')
-	.option('-b, --bust [list]', 'A list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
-	.option('-e, --exclude [regex]', 'Exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
-	.option('-a, --all', 'Try to cache everything in addition to JSON (Overrided by --exclude argument)')
-	.option('-dp, --playback', 'Disable cache playback')
-	.option('-dr, --record', 'Disable recording to cache')
-	.option('-cp, --prefix', 'Prefix for controlling proxy admin control thru HTTP')
-	.option('-phi, --header', 'Specify a proxy header property for identifying cached responses')
-	.option('-l, --log', 'Show log output to console')
+	.option('-c, --config [path]', 'load a config file of options. Command line args will be overridden')
+	.option('-u, --url [url]', 'remote server (e.g. https://network:8080)')
+	.option('-p, --port [number]', 'port for the local proxy server', parseInt)
+	.option('-h, --har [path]', 'load entries from a HAR file and hydrate the cache')
+	.option('-b, --bust [list]', 'a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
+	.option('-e, --exclude [regex]', 'exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
+	.option('-a, --all', 'cache everything from the remote server (Default is to cache just JSON responses)')
+	.option('-dp, --playback', 'disables cache playback')
+	.option('-dr, --record', 'disables recording to cache')
+	.option('-cp, --prefix', 'change the prefix for the proxy\'s web admin endpoints')
+	.option('-phi, --header', 'change the response header property for identifying cached responses')
+	.option('-l, --log', 'print log output to console')
 	.parse(process.argv);
 
 let configOptions = {};
@@ -98,23 +98,3 @@ let jsonCachingProxy = new JsonCachingProxy({
 });
 
 jsonCachingProxy.start();
-
-/**
- * EXAMPLE CONFIG JSON
- *
- * {
- *		"remoteServerUrl": "https://www.google.com",
- *		"proxyPort": 3001,
- *		"inputHarFile": "test.har",
- *		"cacheEverything": true,
- *		"cacheBustingParams": ["_", "dc", "cacheSlayer"],
- *		"excludedRouteMatchers": ["/traffic/.*js", "audience"],
- *		"showConsoleOutput": true,
- *		"dataPlayback": true,
- *		"dataRecord": true,
- *		"commandPrefix": "proxy",
- *		"proxyHeaderIdentifier": "bayon-cache-playback"
- * }
- *
- *
- */

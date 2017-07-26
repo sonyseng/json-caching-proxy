@@ -264,7 +264,7 @@ describe('json-caching-proxy', () => {
           });
       });
 
-      it('generates a har response TODO: Validate against HAR 2.0 schema', () => {
+      it('generates a har response TODO: Validate against HAR 1.2 schema', () => {
         let expectedHarObject = {
           log: {
             version: '1.2',
