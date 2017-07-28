@@ -42,7 +42,8 @@ program
 let configOptions = {};
 if (program.config) {
 	try {
-		configOptions = JSON.parse(stripJsonComments(fs.readFileSync(path.join(cwd, program.config), "utf8")));
+		let filePath = path.isAbsolute(program.config) ? program.config : path.join(cwd, program.config);
+		configOptions = JSON.parse(stripJsonComments(fs.readFileSync(filePath, "utf8")));
 	} catch (err) {
 		console.error('Could not read config file', err.path);
 		process.exit(1);
@@ -77,7 +78,8 @@ if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.l
 let harObject;
 if (inputHarFile) {
 	try {
-		harObject = JSON.parse(fs.readFileSync(path.join(cwd, inputHarFile), "utf8"));
+		let filePath = path.isAbsolute(program.config) ? program.config : path.join(cwd, inputHarFile);
+		harObject = JSON.parse(fs.readFileSync(filePath, "utf8"));
 	} catch (err) {
 		console.error('Could not read har file', err.path);
 	}
