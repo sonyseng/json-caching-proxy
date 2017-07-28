@@ -1,7 +1,6 @@
 # json-caching-proxy [![Build Status](https://travis-ci.org/sonyseng/json-caching-proxy.svg?branch=master)](https://travis-ci.org/sonyseng/json-caching-proxy) [![NPM Version](http://img.shields.io/npm/v/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy) [![NPM Downloads](https://img.shields.io/npm/dm/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy)
 
-NodeJs caching HTTP proxy built on top of [express-http-proxy](https://github.com/villadora/express-http-proxy). Caches requests and responses to an in-memory [HAR-like](http://www.softwareishard.com/blog/har-12-spec/) data structure. Caches JSON content-type responses by default with the ability to cache an entire site; including content-types describing images.
-
+Node caching HTTP proxy built on top of [express-http-proxy](https://github.com/villadora/express-http-proxy). Persists requests and responses to an in-memory HAR-like data structure based on [HAR1.2](http://www.softwareishard.com/blog/har-12-spec/) . Caches JSON content-type responses by default with the ability to cache an entire site; including content-types describing images. Useful for testing front end code, mocking api, and saving the cache to a HAR file which can be used for further tests.
 ## Installation
 
 Command line tool:
@@ -37,7 +36,16 @@ $ npm install -D json-caching-proxy
     -l, --log              print log output to console
 ```
 
-#### Example - basic arguments
+#### Example - basic JSON caching with output
+```
+$ json-caching-proxy -u http://remote:8080 -p 3001 -l
+```
+
+#### Example - further cmd arguments
+```
+$ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -h hydrate.har -a -l
+```
+
 * Routes requests to `http://remote:8080`
 * Runs the proxy on port `3001` on the host machine
 * Removes matching query parameters `time` or `dc`. (e.g. /rest/status?time=1234567). `:` is the delimiter
@@ -46,16 +54,11 @@ $ npm install -D json-caching-proxy
 * Caches everything. This includes JSON as well as other content-types such as images. It's essentially a site backup.
 * Logs output to the console
 
-```
-$ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -h hydrate.har -a -l
-```
-
-#### Example - loading a config file
-
-The example below will load the options from a `config.json` file that may look like this:
+#### Example - loading options from a config file
 
 ```js
-// Complete list of config.json options for the caching proxy
+/* Complete list of config.json options for the caching proxy */
+
 {
   "remoteServerUrl": "http://wikimapia.org",
   "proxyPort": 3001,
@@ -71,11 +74,11 @@ The example below will load the options from a `config.json` file that may look 
 }
 ```
 ```
-$ json-caching-proxy --config config.js
+$ json-caching-proxy --config config.json
 ```
 
 #### Example - print log output to the console
-Setting the `showConsoleOut` value to `true` will start showing the requests being made through the proxy. If the request is cacheable, it will also show the hash key for each request:
+Setting the `showConsoleOutput` value to `true` will start showing the requests being made through the proxy. If the request is cacheable, it will also show the hash key for each request:
 
 ![Console output](http://sonyseng.github.io/json-caching-proxy/images/caching-proxy1.png)
 
@@ -203,8 +206,8 @@ Once the proxy has started, you may point your browser to the following urls to 
 ```
 http://localhost:3001/proxy/playback?enabled=[true|false] - Start/Stop replaying cached requests.
 http://localhost:3001/proxy/record?enabled=[true|false] - Start/Stop recording request/responses to the cache.
-http://localhost:3001/proxy/clear - The HAR data structure that is the in-memory cache will be emptied
-http://localhost:3001/proxy/har - Download the cache as a HAR json file. The file will be named json-caching-proxy.har
+http://localhost:3001/proxy/clear - Empty the in-memory cache.
+http://localhost:3001/proxy/har - Download the cache to json-caching-proxy.har
 ```
 
 ## License
