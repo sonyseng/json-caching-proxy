@@ -260,7 +260,7 @@ class JsonCachingProxy {
 	 * @returns {JsonCachingProxy}
 	 */
 	addBodyParser () {
-		this.app.use(bodyParser.raw({type: '*/*'}));
+		this.app.use(bodyParser.raw({type: '*/*', limit: '100mb'}));
 
 		// Remove the body if there is no body content. Some sites check for malformed requests
 		this.app.use((req, res, next) => {
