@@ -5,9 +5,9 @@
 */
 
 {
-  "remoteServerUrl": "http://wikimapia.org",
+  "remoteServerUrl": "http://52.205.63.7:8080",
   "proxyPort": 3001,
-  "inputHarFile": "./test/test.har",
+  "inputHarFile": "test.har",
   "cacheEverything": true,
   "cacheBustingParams": ["_", "dc", "cacheSlayer"],
   "excludedRouteMatchers": ["/*.js", "/*.png"],

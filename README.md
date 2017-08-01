@@ -25,7 +25,7 @@ $ npm install -D json-caching-proxy
     -c, --config [path]    load a config file of options. Command line args will be overridden
     -u, --url [url]        remote server (e.g. https://network:8080)
     -p, --port [number]    port for the local proxy server
-    -h, --har [path]       load entries from a HAR file and hydrate the cache
+    -hf, --har [path]      load entries from a HAR file and hydrate the cache
     -b, --bust [list]      a list of cache busting query params to ignore. (e.g. -b _:time:dc)
     -e, --exclude [regex]  exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")
     -a, --all              cache everything from the remote server (Default is to cache just JSON responses)
@@ -41,7 +41,13 @@ $ npm install -D json-caching-proxy
 $ json-caching-proxy -u http://remote:8080 -p 3001 -l
 ```
 
-#### Example - further cmd arguments
+#### Example - hydrating the cache
+You may have a HAR file that was generated elsewhere (e.g. Chrome Developer tools). You can load this file and initialize the cache
+```
+$ json-caching-proxy -u http://remote:8080 -p 3001 -hf chromeDevTools.har -l
+```
+
+#### Example - advanced arguments
 ```
 $ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -h hydrate.har -a -l
 ```
@@ -206,8 +212,8 @@ Once the proxy has started, you may point your browser to the following urls to 
 ```
 http://localhost:3001/proxy/playback?enabled=[true|false] - Start/Stop replaying cached requests.
 http://localhost:3001/proxy/record?enabled=[true|false] - Start/Stop recording request/responses to the cache.
+http://localhost:3001/proxy/har - Download cache to json-caching-proxy.har
 http://localhost:3001/proxy/clear - Empty the in-memory cache.
-http://localhost:3001/proxy/har - Download the cache to json-caching-proxy.har
 ```
 
 ## License

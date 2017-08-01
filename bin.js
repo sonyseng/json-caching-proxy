@@ -28,7 +28,7 @@ program
 	.option('-c, --config [path]', 'load a config file of options. Command line args will be overridden')
 	.option('-u, --url [url]', 'remote server (e.g. https://network:8080)')
 	.option('-p, --port [number]', 'port for the local proxy server', parseInt)
-	.option('-h, --har [path]', 'load entries from a HAR file and hydrate the cache')
+	.option('-hf, --har [path]', 'load entries from a HAR file and hydrate the cache')
 	.option('-b, --bust [list]', 'a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
 	.option('-e, --exclude [regex]', 'exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
 	.option('-a, --all', 'cache everything from the remote server (Default is to cache just JSON responses)')
