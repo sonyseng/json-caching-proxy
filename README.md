@@ -20,36 +20,36 @@ $ npm install -D json-caching-proxy
 
   Options:
 
-    -h, --help             output usage information
-    -V, --version          output the version number
-    -c, --config [path]    load a config file of options. Command line args will be overridden
-    -u, --url [url]        remote server (e.g. https://network:8080)
-    -p, --port [number]    port for the local proxy server
-    -hf, --har [path]      load entries from a HAR file and hydrate the cache
-    -b, --bust [list]      a list of cache busting query params to ignore. (e.g. -b _:time:dc)
-    -e, --exclude [regex]  exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")
-    -a, --all              cache everything from the remote server (Default is to cache just JSON responses)
-    -dp, --playback        disables cache playback
-    -dr, --record          disables recording to cache
-    -cp, --prefix          change the prefix for the proxy's web admin endpoints
-    -phi, --header         change the response header property for identifying cached responses
-    -l, --log              print log output to console
+    -h, --help                output usage information
+    -V, --version             output the version number
+    -c, --config [path]       load a config file of options. Command line args will be overridden
+    -u, --url [url]           remote server (e.g. https://network:8080)
+    -p, --port [number]       port for the local proxy server
+    -H, --har [path]          load entries from a HAR file and hydrate the cache
+    -b, --bust [list]         a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)
+    -e, --exclude [regex]     exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")
+    -a, --all                 cache everything from the remote server (Default is to cache just JSON responses)
+    -P, --disablePlayback     disables cache playback
+    -R, --disableRecord       disables recording to cache
+    -C, --cmdPrefix [prefix]  change the prefix for the proxy's web admin endpoints
+    -I, --header [header]     change the response header property for identifying cached responses
+    -l, --log                 print log output to console
 ```
 
 #### Example - basic JSON caching with output
 ```
-$ json-caching-proxy -u http://remote:8080 -p 3001 -l
+$ json-caching-proxy -u http://remote:8080 -l
 ```
 
 #### Example - hydrating the cache
 You may have a HAR file that was generated elsewhere (e.g. Chrome Developer tools). You can load this file and initialize the cache
 ```
-$ json-caching-proxy -u http://remote:8080 -p 3001 -hf chromeDevTools.har -l
+$ json-caching-proxy -u http://remote:8080 -p 3001 -H chromeDevTools.har -l
 ```
 
 #### Example - advanced arguments
 ```
-$ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -h hydrate.har -a -l
+$ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -H hydrate.har -a -l
 ```
 
 * Routes requests to `http://remote:8080`

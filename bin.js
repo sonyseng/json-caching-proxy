@@ -15,12 +15,8 @@ function list (val) {
 	return val.split(':').map(item => item.trim());
 }
 
-// Get a default value
-function def (valToCheck, defaultVal, isBoolean=true) {
-	if (typeof valToCheck !== 'undefined') {
-		return isBoolean ? !!valToCheck : valToCheck;
-	}
-	return defaultVal;
+function isDef (val) {
+	return typeof val !== 'undefined';
 }
 
 program
@@ -28,14 +24,14 @@ program
 	.option('-c, --config [path]', 'load a config file of options. Command line args will be overridden')
 	.option('-u, --url [url]', 'remote server (e.g. https://network:8080)')
 	.option('-p, --port [number]', 'port for the local proxy server', parseInt)
-	.option('-hf, --har [path]', 'load entries from a HAR file and hydrate the cache')
+	.option('-H, --har [path]', 'load entries from a HAR file and hydrate the cache')
 	.option('-b, --bust [list]', 'a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
 	.option('-e, --exclude [regex]', 'exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
 	.option('-a, --all', 'cache everything from the remote server (Default is to cache just JSON responses)')
-	.option('-dp, --playback', 'disables cache playback')
-	.option('-dr, --record', 'disables recording to cache')
-	.option('-cp, --prefix', 'change the prefix for the proxy\'s web admin endpoints')
-	.option('-phi, --header', 'change the response header property for identifying cached responses')
+	.option('-P, --disablePlayback', 'disables cache playback')
+	.option('-R, --disableRecord', 'disables recording to cache')
+	.option('-C, --cmdPrefix [prefix]', 'change the prefix for the proxy\'s web admin endpoints')
+	.option('-I, --header [header]', 'change the response header property for identifying cached responses')
 	.option('-l, --log', 'print log output to console')
 	.parse(process.argv);
 
@@ -61,12 +57,13 @@ if (!remoteServerUrl) {
 let proxyPort = configOptions.proxyPort ? parseInt(configOptions.proxyPort, 10) : program.port;
 let inputHarFile = configOptions.inputHarFile || program.har;
 let cacheBustingParams = configOptions.cacheBustingParams ? configOptions.cacheBustingParams : program.bust;
-let cacheEverything = def(configOptions.cacheEverything, def(program.all, false));
-let dataPlayback = def(configOptions.dataPlayback, def(program.playback, true));
-let dataRecord = def(configOptions.dataRecord, def(program.record, true));
-let showConsoleOutput = def(configOptions.showConsoleOutput, def(program.log, false));
-let commandPrefix = configOptions.commandPrefix || program.prefix;
+let commandPrefix = configOptions.commandPrefix || program.cmdPrefix;
 let proxyHeaderIdentifier = configOptions.proxyHeaderIdentifier || program.header;
+let cacheEverything = isDef(configOptions.cacheEverything) ? configOptions.cacheEverything : isDef(program.all) ? program.all : false;
+let dataPlayback = isDef(configOptions.dataPlayback) ? configOptions.dataPlayback : isDef(program.disablePlayback) ? !program.disablePlayback : true;
+let dataRecord = isDef(configOptions.dataRecord) ? configOptions.dataRecord : isDef(program.disableRecord) ? !program.disableRecord : true;
+let showConsoleOutput = isDef(configOptions.showConsoleOutput) ? configOptions.showConsoleOutput : isDef(program.log) ? program.log : false;
+
 
 let excludedRouteMatchers;
 if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.length > 0) {
@@ -78,7 +75,7 @@ if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.l
 let harObject;
 if (inputHarFile) {
 	try {
-		let filePath = path.isAbsolute(program.config) ? program.config : path.join(cwd, inputHarFile);
+		let filePath = path.isAbsolute(inputHarFile) ? inputHarFile : path.join(cwd, inputHarFile);
 		harObject = JSON.parse(fs.readFileSync(filePath, "utf8"));
 	} catch (err) {
 		console.error('Could not read har file', err.path);
