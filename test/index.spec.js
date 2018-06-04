@@ -1,5 +1,3 @@
-// This has to be the last require or else the fs is screwed up
-
 const util = require('util');
 const assert = require('assert');
 const fetch = require('node-fetch');

@@ -177,7 +177,7 @@ class JsonCachingProxy {
 
 					if (entry.response.headers && (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
 						// Remove content-encoding. gzip compression won't be used
-						entry.response.headers = this.convertToNameValueList(entry.response.headers).filter(header => header.name.toLowerCase() !== 'content-encoding');
+					entry.response.headers = entry.response.headers.filter(header => header.name.toLowerCase() !== 'content-encoding');
 						this.routeCache[key] = entry;
 
 						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
