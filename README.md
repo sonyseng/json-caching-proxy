@@ -34,6 +34,7 @@ $ npm install -D json-caching-proxy
     -C, --cmdPrefix [prefix]  change the prefix for the proxy's web admin endpoints
     -I, --header [header]     change the response header property for identifying cached responses
     -l, --log                 print log output to console
+    -t, --timeout             change the timeout for proxy server
 ```
 
 #### Example - basic JSON caching with output
@@ -76,7 +77,8 @@ $ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -H
   "dataPlayback": true,
   "dataRecord": true,
   "commandPrefix": "proxy",
-  "proxyHeaderIdentifier": "proxy-cache-playback"
+  "proxyHeaderIdentifier": "proxy-cache-playback",
+  "proxyTimeout": 500000
 }
 ```
 ```
@@ -110,7 +112,8 @@ let jsonCachingProxy = new JsonCachingProxy({
     cacheEverything: false,
     dataPlayback: true,
     dataRecord: true,
-    showConsoleOutput: false
+    showConsoleOutput: false,
+    proxyTimeout: 500000
 });
 
 jsonCachingProxy.start();

@@ -24,7 +24,8 @@ class JsonCachingProxy {
 			cacheEverything: false,
 			dataPlayback: true,
 			dataRecord: true,
-			showConsoleOutput: false
+      		showConsoleOutput: false,
+      		proxyTimeout: 3600000 // one hour
 		};
 
 		// Ignore undefined values and combine the options with defaults
@@ -369,11 +370,13 @@ class JsonCachingProxy {
 	 */
 	start (onStarted) {
 		this.server = this.app.listen(this.options.proxyPort);
-
+    	this.server.setTimeout(this.options.proxyTimeout);
+    
 		this.log(chalk.bold(`\JSON Caching Proxy Started:`));
 		this.log(chalk.gray(`==============\n`));
 		this.log(`Remote server url: \t${chalk.bold(this.options.remoteServerUrl)}`);
 		this.log(`Proxy running on port: \t${chalk.bold(this.options.proxyPort)}`);
+		this.log(`Proxy Timeout: \t${chalk.bold(this.options.proxyTimeout)}`);
 		this.log(`Replay cache: \t\t${chalk.bold(this.options.dataPlayback)}`);
 		this.log(`Save to cache: \t\t${chalk.bold(this.options.dataRecord)}`);
 		this.log(`Command prefix: \t${chalk.bold(this.options.commandPrefix)}`);

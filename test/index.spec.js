@@ -9,6 +9,7 @@ const JsonCachingProxy = require('./../index');
 const mockServerPort = 8118;
 const proxyPort = 8119;
 const proxyServerUrl = 'http://localhost:'+ proxyPort;
+const proxyTimeout = 500000;
 
 function jsonFetch(url) {
   return fetch(url, { headers: { 'Accept': 'application/json, text/plain, */*', 'Content-Type': 'application/json'} });
@@ -34,7 +35,8 @@ describe('json-caching-proxy', () => {
       cacheEverything: false,
       dataPlayback: true,
       dataRecord: true,
-      showConsoleOutput: false
+      showConsoleOutput: false,
+      proxyTimeout: proxyTimeout
     };
   });
 
