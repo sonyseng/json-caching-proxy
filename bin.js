@@ -33,7 +33,7 @@ program
 	.option('-C, --cmdPrefix [prefix]', 'change the prefix for the proxy\'s web admin endpoints')
 	.option('-I, --header [header]', 'change the response header property for identifying cached responses')
 	.option('-l, --log', 'print log output to console')
-	.option('-t, --timeout', 'proxy timeout in milliseconds')
+	.option('-t, --timeout', 'proxy timeout in milliseconds', parseInt)
 	.parse(process.argv);
 
 let configOptions = {};
