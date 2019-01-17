@@ -33,6 +33,7 @@ program
 	.option('-C, --cmdPrefix [prefix]', 'change the prefix for the proxy\'s web admin endpoints')
 	.option('-I, --header [header]', 'change the response header property for identifying cached responses')
 	.option('-l, --log', 'print log output to console')
+	.option('-t, --timeout [number]', 'proxy timeout in milliseconds', parseInt)
 	.parse(process.argv);
 
 let configOptions = {};
@@ -63,7 +64,7 @@ let cacheEverything = isDef(configOptions.cacheEverything) ? configOptions.cache
 let dataPlayback = isDef(configOptions.dataPlayback) ? configOptions.dataPlayback : isDef(program.disablePlayback) ? !program.disablePlayback : true;
 let dataRecord = isDef(configOptions.dataRecord) ? configOptions.dataRecord : isDef(program.disableRecord) ? !program.disableRecord : true;
 let showConsoleOutput = isDef(configOptions.showConsoleOutput) ? configOptions.showConsoleOutput : isDef(program.log) ? program.log : false;
-
+let proxyTimeout = configOptions.proxyTimeout ? parseInt(configOptions.proxyTimeout, 10) : program.timeout;
 
 let excludedRouteMatchers;
 if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.length > 0) {
@@ -93,7 +94,8 @@ let jsonCachingProxy = new JsonCachingProxy({
 	dataRecord,
 	commandPrefix,
 	proxyHeaderIdentifier,
-	showConsoleOutput
+  	showConsoleOutput,
+  	proxyTimeout
 });
 
 jsonCachingProxy.start();
