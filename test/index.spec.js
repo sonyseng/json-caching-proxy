@@ -40,7 +40,7 @@ describe('json-caching-proxy', () => {
     };
   });
 
-  describe('Constructor', () => {
+  describe('Constructor', () => {    
     it('initializes the proxy correctly', () => {
       proxy = new JsonCachingProxy(mockOptions);
       assert.deepEqual(proxy.isRouteCacheEmpty(), true, 'Start off with an empty route cache');
@@ -65,6 +65,20 @@ describe('json-caching-proxy', () => {
 
   describe('Utility methods', () => {
     proxy = new JsonCachingProxy();
+
+    it('removeCookiesDomain - Removes the domain attr from cookie headers', () => {
+      let mockCookies = [
+        'myCookie1=TEST;domain=facebook.com;random=2323',
+        'myCookie2=TEST;random=4545',
+        'myCookie3=TEST;domain=google.com;random=454545',
+      ];
+
+     assert.deepEqual(proxy.removeCookiesDomain(mockCookies), [
+        'myCookie1=TEST;random=2323',
+        'myCookie2=TEST;random=4545',
+        'myCookie3=TEST;random=454545',
+      ]);
+    });
 
     it('convertToNameValueList - Generate a unique hash key from a har file entry request object', () => {
       let nameValues = proxy.convertToNameValueList({one: 1, two: 2, three: 3});
@@ -224,18 +238,18 @@ describe('json-caching-proxy', () => {
       mockApp.use('/excluded2', (req, res) => res.send(mockText));
     });
 
-    after(() => {
-      mockRemoteServer.close();
+    after(done => {
+      mockRemoteServer.close(done);
     });
 
     describe('Admin', () => {
-      beforeEach(() => {
+      beforeEach(done => {
         proxy = new JsonCachingProxy(mockOptions);
-        proxy.start();
+        proxy.start(done);
       });
 
-      afterEach(() => {
-        proxy.stop();
+      afterEach(done => {
+        proxy.stop(done);
       });
 
       it('disables playback from cache', () => {
@@ -264,7 +278,7 @@ describe('json-caching-proxy', () => {
           });
       });
 
-      it('generates a har response TODO: Validate against HAR 1.2 schema', () => {
+      it('generates a har response. TODO: Validate against HAR 1.2 schema', () => {
         let expectedHarObject = {
           log: {
             version: '1.2',
@@ -330,53 +344,20 @@ describe('json-caching-proxy', () => {
     });
 
     describe('Core', () => {
-      beforeEach(() => {
-        proxy = new JsonCachingProxy(mockOptions);
-        proxy.start();
-      });
-
-      afterEach(() => {
-        proxy.stop();
-      });
-
-      it('hydrates the cache with HAR entry routes', (done) => {
-        let mockHarObject = {
-          log: {
-            version: '1.2',
-            creator: {
-              name: npmPackage.name,
-              version: npmPackage.version
-            },
-            entries: [{
-              request: {
-                startedDateTime: '',
-                method: 'GET',
-                url: '/test',
-                cookies: [],
-                headers: [],
-                queryString: [],
-                headersSize: -1,
-                bodySize: -1
+      describe('HAR', () => {
+        it('hydrates the cache with HAR entry routes', (done) => {
+          let mockHarObject = {
+            log: {
+              version: '1.2',
+              creator: {
+                name: npmPackage.name,
+                version: npmPackage.version
               },
-              response: {
-                status: 200,
-                cookies: [],
-                headers: [],
-                content: {
-                  size: -1,
-                  mimeType: 'application/json; charset=utf-8',
-                  text: '{"a":1,"b":"Some Value"}',
-                  encoding: 'utf8'
-                },
-                headersSize: -1,
-                bodySize: -1
-              }
-            },
-              {
+              entries: [{
                 request: {
                   startedDateTime: '',
                   method: 'GET',
-                  url: '/another',
+                  url: '/test',
                   cookies: [],
                   headers: [],
                   queryString: [],
@@ -396,59 +377,95 @@ describe('json-caching-proxy', () => {
                   headersSize: -1,
                   bodySize: -1
                 }
-              }]
-          }
-        };
-        let proxy = new JsonCachingProxy({
-          remoteServerUrl: 'http://localhost:' + mockServerPort,
-          proxyPort: proxyPort,
-          harObject: mockHarObject
+              },
+                {
+                  request: {
+                    startedDateTime: '',
+                    method: 'GET',
+                    url: '/another',
+                    cookies: [],
+                    headers: [],
+                    queryString: [],
+                    headersSize: -1,
+                    bodySize: -1
+                  },
+                  response: {
+                    status: 200,
+                    cookies: [],
+                    headers: [],
+                    content: {
+                      size: -1,
+                      mimeType: 'application/json; charset=utf-8',
+                      text: '{"a":1,"b":"Some Value"}',
+                      encoding: 'utf8'
+                    },
+                    headersSize: -1,
+                    bodySize: -1
+                  }
+                }]
+            }
+          };
+  
+          let proxy = new JsonCachingProxy({
+            remoteServerUrl: 'http://localhost:' + mockServerPort + 1000,
+            proxyPort: proxyPort,
+            harObject: mockHarObject
+          });
+  
+          proxy.start(() => {
+            assert.equal(proxy.getTotalCachedRoutes(), 2);
+            proxy.stop();
+            done()
+          });
         });
+      });
 
-        proxy.start(() => {
-          assert.equal(proxy.getTotalCachedRoutes(), 2);
-          proxy.stop();
-          done();
+      describe('General', () => {
+        beforeEach(done => {
+          proxy = new JsonCachingProxy(mockOptions);
+          proxy.start(done);
         });
-      });
-
-      it('cache overwrites response body if request generated key is the same', () => {
-        return jsonFetch(`${proxyServerUrl}/test`) // Make the first request to fill the cache
-          .then(() => mockJson.a = mockJson.a + 10) // Increment the value and see if it comes back from the cache
-          .then(() => jsonFetch(proxyServerUrl + '/test')) // Make the same request with different value
-          .then(res => res.json())
-          .then(json => assert(json.a < mockJson.a, 'Should be less than because cache has old value'))
-          .then(() => jsonFetch(`${proxyServerUrl}/test`))
-      });
-
-      it('proxies and caches JSON', () => {
-        return jsonFetch(`${proxyServerUrl}/test`)
-          .then(res => res.json())
-          .then(json => assert.deepEqual(json, mockJson))
-          .then(() => jsonFetch(`${proxyServerUrl}/test`))
-          .then(res => res.json())
-          .then(json => assert.deepEqual(json, mockJson))
-          .then(() => assert.equal(proxy.getTotalCachedRoutes(), 1));
-      });
-
-      it('excludes routes by regexp', () => {
-        return jsonFetch(`${proxyServerUrl}/excluded1`)
-          .then(() => jsonFetch(`${proxyServerUrl}/excluded2`))
-          .then(() => assert.equal(proxy.getTotalCachedRoutes(), 0))
-          .then(() => jsonFetch(`${proxyServerUrl}/test`))
-          .then(() => assert.equal(proxy.getTotalCachedRoutes(), 1));
-      });
-
-      it('calls user-defined express middleware', () => {
-        return jsonFetch(`${proxyServerUrl}/test2`)
-          .then(res => res.text())
-          .then(text => assert.equal(text, 'test2'))
-          .then(() => jsonFetch(`${proxyServerUrl}/test3`))
-          .then(res => res.text())
-          .then(text => assert.equal(text, 'test3'));
+  
+        afterEach(done => {
+          proxy.stop(done);
+        });
+  
+        it('cache overwrites response body if request generated key is the same', () => {
+          return jsonFetch(`${proxyServerUrl}/test`) // Make the first request to fill the cache
+            .then(() => mockJson.a = mockJson.a + 10) // Increment the value and see if it comes back from the cache
+            .then(() => jsonFetch(proxyServerUrl + '/test')) // Make the same request with different value
+            .then(res => res.json())
+            .then(json => assert(json.a < mockJson.a, 'Should be less than because cache has the old value'))
+            .then(() => jsonFetch(`${proxyServerUrl}/test`))
+        });
+  
+        it('proxies and caches JSON', () => {
+          return jsonFetch(`${proxyServerUrl}/test`)
+            .then(res => res.json())
+            .then(json => assert.deepEqual(json, mockJson))
+            .then(() => jsonFetch(`${proxyServerUrl}/test`))
+            .then(res => res.json())
+            .then(json => assert.deepEqual(json, mockJson))
+            .then(() => assert.equal(proxy.getTotalCachedRoutes(), 1));
+        });
+  
+        it('excludes routes by regexp', () => {
+          return jsonFetch(`${proxyServerUrl}/excluded1`)
+            .then(() => jsonFetch(`${proxyServerUrl}/excluded2`))
+            .then(() => assert.equal(proxy.getTotalCachedRoutes(), 0))
+            .then(() => jsonFetch(`${proxyServerUrl}/test`))
+            .then(() => assert.equal(proxy.getTotalCachedRoutes(), 1));
+        });
+  
+        it('calls user-defined express middleware', () => {
+          return jsonFetch(`${proxyServerUrl}/test2`)
+            .then(res => res.text())
+            .then(text => assert.equal(text, 'test2'))
+            .then(() => jsonFetch(`${proxyServerUrl}/test3`))
+            .then(res => res.text())
+            .then(text => assert.equal(text, 'test3'));
+        });
       });
     });
-
   });
-
 });
