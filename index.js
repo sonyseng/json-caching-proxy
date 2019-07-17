@@ -25,7 +25,8 @@ class JsonCachingProxy {
 			dataPlayback: true,
 			dataRecord: true,
 			showConsoleOutput: false,
-			proxyTimeout: 3600000 // one hour
+			proxyTimeout: 3600000, // one hour
+			deleteCookieDomain: false,
 		};
 
 		// Ignore undefined values and combine the options with defaults
@@ -361,7 +362,7 @@ class JsonCachingProxy {
 					res.location(urlUtil.parse(location).path);
 				}
 
-				if (res._headers['set-cookie']) {
+				if (this.options.deleteCookieDomain && res._headers['set-cookie']) {
 					res.header('set-cookie', this.removeCookiesDomain(res._headers['set-cookie'] || []));
 				}
 
@@ -406,6 +407,7 @@ class JsonCachingProxy {
 		this.log(`Command prefix: \t${chalk.bold(this.options.commandPrefix)}`);
 		this.log(`Proxy response header: \t${chalk.bold(this.options.proxyHeaderIdentifier)}`);
 		this.log(`Cache all: \t\t${chalk.bold(this.options.cacheEverything)}`);
+		this.log(`Delete cookies domain: \t${chalk.bold(this.options.deleteCookieDomain)}`);
 		this.log(`Cache busting params: \t${chalk.bold(this.options.cacheBustingParams)}`);
 		this.log(`Excluded routes: `);
 		this.options.excludedRouteMatchers.forEach((regExp) => {
