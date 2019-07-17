@@ -11,7 +11,7 @@ class JsonCachingProxy {
 	/**
 	 * @param {Object} options - Options passed into the ctor will override defaults if defined
 	 */
-	constructor (options={}) {
+	constructor(options = {}) {
 		this.defaultOptions = {
 			remoteServerUrl: 'http://localhost:8080',
 			proxyPort: 3001,
@@ -25,7 +25,8 @@ class JsonCachingProxy {
 			dataPlayback: true,
 			dataRecord: true,
 			showConsoleOutput: false,
-			proxyTimeout: 3600000 // one hour
+			proxyTimeout: 3600000, // one hour
+			deleteCookieDomain: false, // Removes the domain portion from all cookies
 		};
 
 		// Ignore undefined values and combine the options with defaults
@@ -54,11 +55,31 @@ class JsonCachingProxy {
 	}
 
 	/**
+	* Remove the domain portion of any cookies from the object
+	* @param {Object} cookies - Express cookies array
+	* @returns {Object[]} - Cookies with domain portion removed
+	*/
+	removeCookiesDomain(cookies) {
+		return cookies.map(c => {
+			let cookieParts = c.split(';');
+			let newCookieParts = [];
+
+			cookieParts.forEach(c => {
+				if (c.indexOf('domain') === -1) {
+					newCookieParts.push(c);
+				}
+			});
+
+			return newCookieParts.join(';');
+		});
+	}
+
+	/**
 	 * Returns an Object's own  properties into an array of name-value pair objects
 	 * @param {Object} obj
 	 * @returns {Object[]}
 	 */
-	convertToNameValueList (obj) {
+	convertToNameValueList(obj) {
 		return typeof obj === 'object' ? Object.keys(obj).map(key => { return { name: key, value: obj[key] }; }) : [];
 	}
 
@@ -67,8 +88,8 @@ class JsonCachingProxy {
 	 * @param {Object} harEntryReq - HAR request object
 	 * @returns {Object} A unique key, hash tuple that identifies the request
 	 */
-	genKeyFromHarReq (harEntryReq) {
-		let { method, url, queryString=[], postData={text: ''} } = harEntryReq;
+	genKeyFromHarReq(harEntryReq) {
+		let { method, url, queryString = [], postData = { text: '' } } = harEntryReq;
 		let uri = urlUtil.parse(url).pathname;
 		let postParams = postData.text;
 
@@ -78,7 +99,7 @@ class JsonCachingProxy {
 		let hash = crypto.createHash('md5').update(plainText).digest("hex");
 		let key = `${method} ${uri} ${hash}`;
 
-		return {key, hash};
+		return { key, hash };
 	}
 
 	/**
@@ -86,12 +107,12 @@ class JsonCachingProxy {
 	 * @param {Object} req - An express IncomingMessage request
 	 * @returns {string} A unique hash key that identifies the request
 	 */
-	genKeyFromExpressReq (req) {
+	genKeyFromExpressReq(req) {
 		return this.genKeyFromHarReq({
 			method: req.method,
 			url: req.url,
 			queryString: this.convertToNameValueList(req.query),
-			postData: {text: req.body && req.body.length > 0 ? req.body.toString('utf8') : ''}
+			postData: { text: req.body && req.body.length > 0 ? req.body.toString('utf8') : '' }
 		});
 	}
 
@@ -103,7 +124,7 @@ class JsonCachingProxy {
 	 * @param {Object} data - An express response body (the content)
 	 * @returns {Object} A HAR entry object
 	 */
-	createHarEntry (startedDateTime, req, res, data) {
+	createHarEntry(startedDateTime, req, res, data) {
 		let reqMimeType = req.get('Content-Type');
 		let resMimeType = res.get('Content-Type') || 'text/plain';
 		let encoding = (/^text\/|^application\/(javascript|json)/).test(resMimeType) ? 'utf8' : 'base64';
@@ -153,7 +174,7 @@ class JsonCachingProxy {
 	 * @param {string} uri - e.g. http://www.api.com/rest/accounts
 	 * @returns {boolean} Whether the test is true for some matcher
 	 */
-	isRouteExcluded (method, uri) {
+	isRouteExcluded(method, uri) {
 		return this.options.excludedRouteMatchers.some(regExp => regExp.test(`${method} ${uri}`))
 	}
 
@@ -162,10 +183,10 @@ class JsonCachingProxy {
 	 * @param {Object} harObject - A standard HAR file object that contains a collection of entries
 	 * @returns {JsonCachingProxy}
 	 */
-	addHarEntriesToCache (harObject) {
+	addHarEntriesToCache(harObject) {
 		if (harObject) {
 			harObject.log.entries.forEach(entry => {
-				let {key, hash} = this.genKeyFromHarReq(entry.request);
+				let { key, hash } = this.genKeyFromHarReq(entry.request);
 
 				if (this.isRouteExcluded(entry.request.method, entry.request.url)) {
 					this.log(chalk.red('Excluded from Cache', chalk.bold(entry.request.method, entry.request.url)));
@@ -178,7 +199,7 @@ class JsonCachingProxy {
 
 					if (entry.response.headers && (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
 						// Remove content-encoding. gzip compression won't be used
-					entry.response.headers = entry.response.headers.filter(header => header.name.toLowerCase() !== 'content-encoding');
+						entry.response.headers = entry.response.headers.filter(header => header.name.toLowerCase() !== 'content-encoding');
 						this.routeCache[key] = entry;
 
 						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
@@ -195,7 +216,7 @@ class JsonCachingProxy {
 	 * the cache, disable/enable playback/recording, and generate a har file of the cache to download for later use.
 	 * @returns {JsonCachingProxy}
 	 */
-	addAdminRoutes () {
+	addAdminRoutes() {
 		// These are not really restful because the GET is changing state. But it's easier to use in a browser
 		this.app.get(`/${this.options.commandPrefix}/playback`, (req, res) => {
 			this.options.dataPlayback = typeof req.query.enabled !== 'undefined' ? req.query.enabled === 'true'.toLowerCase() : this.options.dataPlayback;
@@ -244,7 +265,7 @@ class JsonCachingProxy {
 	 * @param {Object[]} middlewareList - A list of route/handler pairs
 	 * @returns {JsonCachingProxy}
 	 */
-	addMiddleWareRoutes (middlewareList) {
+	addMiddleWareRoutes(middlewareList) {
 		middlewareList.forEach(mw => {
 			if (mw.route) {
 				this.app.use(mw.route, mw.handle);
@@ -260,8 +281,8 @@ class JsonCachingProxy {
 	 * Add Request body parsing into RAW if there is actual body content
 	 * @returns {JsonCachingProxy}
 	 */
-	addBodyParser () {
-		this.app.use(bodyParser.raw({type: '*/*', limit: '100mb'}));
+	addBodyParser() {
+		this.app.use(bodyParser.raw({ type: '*/*', limit: '100mb' }));
 
 		// Remove the body if there is no body content. Some sites check for malformed requests
 		this.app.use((req, res, next) => {
@@ -279,12 +300,12 @@ class JsonCachingProxy {
 	 * An express route that reads from the cache if possible for any routes persisted in cache memory
 	 * @returns {JsonCachingProxy}
 	 */
-	addCachingRoute () {
+	addCachingRoute() {
 		this.app.use('/', (req, res, next) => {
 			if (!this.options.dataPlayback) {
 				next();
 			} else {
-				let {key, hash} = this.genKeyFromExpressReq(req);
+				let { key, hash } = this.genKeyFromExpressReq(req);
 				let entry = this.routeCache[key];
 
 				if (!(entry && entry.response && entry.response.content)) {
@@ -332,7 +353,7 @@ class JsonCachingProxy {
 	 * Modifies locations on redirects.
 	 * @returns {JsonCachingProxy}
 	 */
-	addProxyRoute () {
+	addProxyRoute() {
 		this.app.use('/', proxy(this.options.remoteServerUrl, {
 			userResDecorator: (rsp, rspData, req, res) => {
 				// Handle Redirects by modifying the location property of the response header
@@ -341,13 +362,17 @@ class JsonCachingProxy {
 					res.location(urlUtil.parse(location).path);
 				}
 
+				if (this.options.deleteCookieDomain && res._headers['set-cookie']) {
+					res.header('set-cookie', this.removeCookiesDomain(res._headers['set-cookie'] || []));
+				}
+
 				if (this.isRouteExcluded(req.method, req.url)) {
 					this.log(chalk.red('Exclude Proxied Resource', chalk.bold(req.method, req.url)));
 				} else {
 					let mimeType = res._headers['content-type'];
 
 					if (this.options.dataRecord && (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
-						let {key, hash} = this.genKeyFromExpressReq(req);
+						let { key, hash } = this.genKeyFromExpressReq(req);
 						let entry = this.createHarEntry(new Date().toISOString(), req, res, rspData);
 						this.routeCache[key] = entry;
 						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
@@ -365,13 +390,13 @@ class JsonCachingProxy {
 
 	/**
 	 * Start the server and generate any log output if needed
-	 * @param {Function} call back fn executed after the server has started
+	 * @param {Function} callback fn executed after the server has started
 	 * @returns {JsonCachingProxy}
 	 */
-	start (onStarted) {
+	start(onStarted) {
 		this.server = this.app.listen(this.options.proxyPort);
 		this.server.setTimeout(this.options.proxyTimeout);
-    
+
 		this.log(chalk.bold(`\JSON Caching Proxy Started:`));
 		this.log(chalk.gray(`==============\n`));
 		this.log(`Remote server url: \t${chalk.bold(this.options.remoteServerUrl)}`);
@@ -382,6 +407,7 @@ class JsonCachingProxy {
 		this.log(`Command prefix: \t${chalk.bold(this.options.commandPrefix)}`);
 		this.log(`Proxy response header: \t${chalk.bold(this.options.proxyHeaderIdentifier)}`);
 		this.log(`Cache all: \t\t${chalk.bold(this.options.cacheEverything)}`);
+		this.log(`Delete cookies domain: \t${chalk.bold(this.options.deleteCookieDomain)}`);
 		this.log(`Cache busting params: \t${chalk.bold(this.options.cacheBustingParams)}`);
 		this.log(`Excluded routes: `);
 		this.options.excludedRouteMatchers.forEach((regExp) => {
@@ -405,11 +431,12 @@ class JsonCachingProxy {
 
 	/**
 	 * Stops the proxy server
+		* @param {Function} callback fn executed after the server has stopped
 	 * @returns {JsonCachingProxy}
 	 */
-	stop () {
+	stop(onStopped) {
 		if (this.server) {
-			this.server.close();
+			this.server.close(onStopped);
 			this.log(chalk.bold('\nStopping Proxy Server'));
 		}
 
@@ -420,55 +447,55 @@ class JsonCachingProxy {
 	 * Returns the options passed into the proxy
 	 * @returns {Object}
 	 */
-	getOptions () { return this.options; }
+	getOptions() { return this.options; }
 
 	/**
 	 * Returns the default options that are used when no options are passed in
 	 * @returns {Object}
 	 */
-	getDefaultOptions () { return this.defaultOptions; }
+	getDefaultOptions() { return this.defaultOptions; }
 
 	/**
 	 * Returns the Express App
 	 * @returns {Object}
 	 */
-	getApp () { return this.app; }
+	getApp() { return this.app; }
 
 	/**
 	 * Returns the Node server object
 	 * @returns {Object}
 	 */
-	getServer () { return this.server; }
+	getServer() { return this.server; }
 
 	/**
 	 * Returns the key value map of all the excluded params
 	 * @returns {Object}
 	 */
-	getExcludedParamMap () { return this.excludedParamMap; }
+	getExcludedParamMap() { return this.excludedParamMap; }
 
 	/**
 	 * Count of total cached routes in memory
 	 * @returns {number}
 	 */
-	getTotalCachedRoutes () { return Object.keys(this.routeCache).length; }
+	getTotalCachedRoutes() { return Object.keys(this.routeCache).length; }
 
 	/**
 	 * Determines if we have anything in the cache
 	 * @returns {boolean}
 	 */
-	isRouteCacheEmpty () { return this.getTotalCachedRoutes() === 0; }
+	isRouteCacheEmpty() { return this.getTotalCachedRoutes() === 0; }
 
 	/**
 	 * Is the server sending us cached responses
 	 * @returns {boolean}
 	 */
-	isReplaying () { return this.options.dataPlayback; }
+	isReplaying() { return this.options.dataPlayback; }
 
 	/**
 	 * Is the server saving to the cache
 	 * @returns {JsonCachingProxy}
 	 */
-	isRecording () { return this.options.dataRecord; }
+	isRecording() { return this.options.dataRecord; }
 }
 
 module.exports = JsonCachingProxy;

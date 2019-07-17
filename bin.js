@@ -34,6 +34,7 @@ program
 	.option('-I, --header [header]', 'change the response header property for identifying cached responses')
 	.option('-l, --log', 'print log output to console')
 	.option('-t, --timeout [number]', 'proxy timeout in milliseconds', parseInt)
+	.option('-d, --deleteCookieDomain', 'Remove the Domain portion of all cookies')
 	.parse(process.argv);
 
 let configOptions = {};
@@ -65,6 +66,7 @@ let dataPlayback = isDef(configOptions.dataPlayback) ? configOptions.dataPlaybac
 let dataRecord = isDef(configOptions.dataRecord) ? configOptions.dataRecord : isDef(program.disableRecord) ? !program.disableRecord : true;
 let showConsoleOutput = isDef(configOptions.showConsoleOutput) ? configOptions.showConsoleOutput : isDef(program.log) ? program.log : false;
 let proxyTimeout = configOptions.proxyTimeout ? parseInt(configOptions.proxyTimeout, 10) : program.timeout;
+let deleteCookieDomain = isDef(configOptions.deleteCookieDomain) ? configOptions.deleteCookieDomain : isDef(program.deleteCookieDomain) ? program.deleteCookieDomain : false;
 
 let excludedRouteMatchers;
 if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.length > 0) {
@@ -94,8 +96,9 @@ let jsonCachingProxy = new JsonCachingProxy({
 	dataRecord,
 	commandPrefix,
 	proxyHeaderIdentifier,
-  	showConsoleOutput,
-  	proxyTimeout
+	showConsoleOutput,
+	proxyTimeout,
+	deleteCookieDomain
 });
 
 jsonCachingProxy.start();
