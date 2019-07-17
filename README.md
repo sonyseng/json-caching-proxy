@@ -85,13 +85,6 @@ $ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -H
 $ json-caching-proxy --config config.json
 ```
 
-#### Example - print log output to the console
-Setting the `showConsoleOutput` value to `true` will start showing the requests being made through the proxy. If the request is cacheable, it will also show the hash key for each request:
-
-![Console output](http://sonyseng.github.io/json-caching-proxy/images/caching-proxy1.png)
-
-![Console output](http://sonyseng.github.io/json-caching-proxy/images/caching-proxy2.png)
-
 ## Programmatic Usage
 
 API docs can be found here: [JsonCachingProxy doc](http://sonyseng.github.io/json-caching-proxy/jsdoc/JsonCachingProxy.html)
