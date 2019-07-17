@@ -35,6 +35,7 @@ $ npm install -D json-caching-proxy
     -I, --header [header]     change the response header property for identifying cached responses
     -l, --log                 print log output to console
     -t, --timeout             change the timeout for proxy server
+    -d, --deleteCookieDomain  Remove the Domain portion of all cookies
 ```
 
 #### Example - basic JSON caching with output
@@ -106,7 +107,8 @@ let jsonCachingProxy = new JsonCachingProxy({
     dataPlayback: true,
     dataRecord: true,
     showConsoleOutput: false,
-    proxyTimeout: 500000
+    proxyTimeout: 500000,
+    deleteCookieDomain: true
 });
 
 jsonCachingProxy.start();

@@ -36,7 +36,8 @@ describe('json-caching-proxy', () => {
       dataPlayback: true,
       dataRecord: true,
       showConsoleOutput: false,
-      proxyTimeout: proxyTimeout
+      proxyTimeout: proxyTimeout,
+      deleteCookieDomain: false
     };
   });
 

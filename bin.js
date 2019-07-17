@@ -34,7 +34,7 @@ program
 	.option('-I, --header [header]', 'change the response header property for identifying cached responses')
 	.option('-l, --log', 'print log output to console')
 	.option('-t, --timeout [number]', 'proxy timeout in milliseconds', parseInt)
-	.option('-d, --deleteCookieDoman', 'Remove the Domain portion of all cookies')
+	.option('-d, --deleteCookieDomain', 'Remove the Domain portion of all cookies')
 	.parse(process.argv);
 
 let configOptions = {};
@@ -96,8 +96,8 @@ let jsonCachingProxy = new JsonCachingProxy({
 	dataRecord,
 	commandPrefix,
 	proxyHeaderIdentifier,
-  	showConsoleOutput,
-  	proxyTimeout,
+	showConsoleOutput,
+	proxyTimeout,
 	deleteCookieDomain
 });
 

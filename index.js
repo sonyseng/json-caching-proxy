@@ -26,7 +26,7 @@ class JsonCachingProxy {
 			dataRecord: true,
 			showConsoleOutput: false,
 			proxyTimeout: 3600000, // one hour
-			deleteCookieDomain: false,
+			deleteCookieDomain: false, // Removes the domain portion from all cookies
 		};
 
 		// Ignore undefined values and combine the options with defaults
