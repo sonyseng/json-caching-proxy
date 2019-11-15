@@ -55,7 +55,7 @@ class JsonCachingProxy {
 	}
 
 	/**
-	* Remove the domain portion of any cookies from the object
+	* Remove the domain portion of any cookies from the object. Remove the secure attribute so we can set cookies to https targets
 	* @param {Object} cookies - Express cookies array
 	* @returns {Object[]} - Cookies with domain portion removed
 	*/
@@ -64,10 +64,12 @@ class JsonCachingProxy {
 			let cookieParts = c.split(';');
 			let newCookieParts = [];
 
+      console.log(cookieParts);
+
 			cookieParts.forEach(c => {
-				if (c.indexOf('domain') === -1) {
+				if (c.indexOf('domain') === -1 && c.indexOf('secure') === -1) {
 					newCookieParts.push(c);
-				}
+        }
 			});
 
 			return newCookieParts.join(';');
