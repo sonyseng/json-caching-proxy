@@ -64,6 +64,8 @@ class JsonCachingProxy {
 			let cookieParts = c.split(';');
 			let newCookieParts = [];
 
+      console.log(cookieParts);
+
 			cookieParts.forEach(c => {
 				if (c.indexOf('domain') === -1 && c.indexOf('secure') === -1) {
 					newCookieParts.push(c);
