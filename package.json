@@ -30,6 +30,6 @@
   "devDependencies": {
     "jsdoc": "^3.5.3",
     "mocha": "^6.1.4",
-    "node-fetch": "^1.6.3"
+    "node-fetch": "^2.6.1"
   }
 }
