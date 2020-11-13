@@ -35,7 +35,10 @@ $ npm install -D json-caching-proxy
     -I, --header [header]     change the response header property for identifying cached responses
     -l, --log                 print log output to console
     -t, --timeout             change the timeout for proxy server
-    -d, --deleteCookieDomain  Remove the Domain portion of all cookies
+    -d, --deleteCookieDomain  remove the Domain portion of all cookies
+    -o, --overrideCors [url]  override Access-Control-Allow-Origin
+    -z, --useCorsCredentials  set Access-Control-Allow-Credentials to true
+
 ```
 
 #### Example - basic JSON caching with output
@@ -43,11 +46,20 @@ $ npm install -D json-caching-proxy
 $ json-caching-proxy -u http://remote:8080 -l
 ```
 
+#### Example - Bypassing CORS when proxying to a 3rd party api server
+```
+$ json-caching-proxy -u http://cors-api.example.com -o localhost:9000 -z
+```
+This use case occurs when developing a browser application against an api server on a different host with CORS restrictions.
+In this example we might be running a dev server that's hosting a frontend application on http://localhost:9000 and there is
+browser javascript that needs to fetch from http://cors-api.example.com. The `-z` option tells the proxy to set up auth headers
+in case the code uses cookies or tokens (e.g. Bearer tokens)
+
 #### Example - hydrating the cache
-You may have a HAR file that was generated elsewhere (e.g. Chrome Developer tools). You can load this file and initialize the cache
 ```
 $ json-caching-proxy -u http://remote:8080 -p 3001 -H chromeDevTools.har -l
 ```
+You may have a HAR file that was generated elsewhere (e.g. Chrome Developer tools). You can load this file and initialize the cache
 
 #### Example - advanced arguments
 ```
@@ -79,7 +91,10 @@ $ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -H
   "dataRecord": true,
   "commandPrefix": "proxy",
   "proxyHeaderIdentifier": "proxy-cache-playback",
-  "proxyTimeout": 500000
+  "proxyTimeout": 500000,
+  "deleteCookieDomain": true,
+  "overrideCors": "localhost:8080",
+  "useCorsCredentials": true
 }
 ```
 ```
@@ -108,7 +123,9 @@ let jsonCachingProxy = new JsonCachingProxy({
     dataRecord: true,
     showConsoleOutput: false,
     proxyTimeout: 500000,
-    deleteCookieDomain: true
+    deleteCookieDomain: true,
+    overrideCors: "localhost:8080",
+    useCorsCredentials: true
 });
 
 jsonCachingProxy.start();

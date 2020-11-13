@@ -37,30 +37,32 @@ describe('json-caching-proxy', () => {
       dataRecord: true,
       showConsoleOutput: false,
       proxyTimeout: proxyTimeout,
-      deleteCookieDomain: false
+      deleteCookieDomain: false,
+      overrideCors: false,
+      useCorsCredentials: false
     };
   });
 
   describe('Constructor', () => {    
     it('initializes the proxy correctly', () => {
       proxy = new JsonCachingProxy(mockOptions);
-      assert.deepEqual(proxy.isRouteCacheEmpty(), true, 'Start off with an empty route cache');
-      assert.equal(proxy.getServer(), null, 'Server does nto exist until app start');
-      assert.equal(typeof proxy.getApp(), 'function', 'App is defined as the express() function');
+      assert.deepStrictEqual(proxy.isRouteCacheEmpty(), true, 'Start off with an empty route cache');
+      assert.strictEqual(proxy.getServer(), null, 'Server does nto exist until app start');
+      assert.strictEqual(typeof proxy.getApp(), 'function', 'App is defined as the express() function');
     });
 
     it('passes defined options which override defaults', () => {
       proxy = new JsonCachingProxy(mockOptions);
       let options = proxy.getOptions();
-      assert.deepEqual(options, mockOptions, 'options will override defaults');
-      assert.deepEqual(proxy.getExcludedParamMap(), {_:true, dc: true}, 'param array becomes an object map');
+      assert.deepStrictEqual(options, mockOptions, 'options will override defaults');
+      assert.deepStrictEqual(proxy.getExcludedParamMap(), {_:true, dc: true}, 'param array becomes an object map');
     });
 
     it('passes undefined options which do NOT override defaults', () => {
       proxy = new JsonCachingProxy({cacheBustinParams: null});
       let options = proxy.getOptions();
       let defaultOptions = proxy.getDefaultOptions();
-      assert.deepEqual(options, defaultOptions, 'options will fall back to defaults');
+      assert.deepStrictEqual(options, defaultOptions, 'options will fall back to defaults');
     });
   });
 
@@ -74,7 +76,7 @@ describe('json-caching-proxy', () => {
         'myCookie3=TEST;domain=google.com;random=454545',
       ];
 
-     assert.deepEqual(proxy.removeCookiesDomain(mockCookies), [
+     assert.deepStrictEqual(proxy.removeCookiesDomain(mockCookies), [
         'myCookie1=TEST;random=2323',
         'myCookie2=TEST;random=4545',
         'myCookie3=TEST;random=454545',
@@ -83,7 +85,7 @@ describe('json-caching-proxy', () => {
 
     it('convertToNameValueList - Generate a unique hash key from a har file entry request object', () => {
       let nameValues = proxy.convertToNameValueList({one: 1, two: 2, three: 3});
-      assert.deepEqual(nameValues, [{name:'one', value:1}, {name: 'two', value: 2}, {name: 'three', value: 3}]);
+      assert.deepStrictEqual(nameValues, [{name:'one', value:1}, {name: 'two', value: 2}, {name: 'three', value: 3}]);
     });
 
     it('genKeyFromHarReq - create a unique md5 hash from a har entry request  method/url/querystring/postdata', () => {
@@ -110,24 +112,24 @@ describe('json-caching-proxy', () => {
       let keyHash = proxy.genKeyFromHarReq(harEntryRequest);
 
       harEntryRequest.method = 'POST';
-      assert.notEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing method changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing method changes the hash');
       harEntryRequest.method = 'GET';
-      assert.equal(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing method back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing method back should generate the same hash');
 
       harEntryRequest.url = 'localhost';
-      assert.notEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing url changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing url changes the hash');
       harEntryRequest.url = 'http://sleepy:3001/';
-      assert.equal(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing url back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing url back should generate the same hash');
 
       harEntryRequest.queryString = [{name: '660', value: ''}];
-      assert.notEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing query string changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing query string changes the hash');
       harEntryRequest.queryString = [];
-      assert.equal(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing query string back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing query string back should generate the same hash');
 
       harEntryRequest.postData = {text: 'Changed'};
-      assert.notEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing post data changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing post data changes the hash');
       harEntryRequest.postData = {text: 'Original'};
-      assert.equal(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing post data back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing post data back should generate the same hash');
     });
 
     it('genKeyFromExpressReq - create a unique md5 hash from an express request (IncomingMessage)', () => {
@@ -141,24 +143,24 @@ describe('json-caching-proxy', () => {
       let keyHash = proxy.genKeyFromExpressReq(req);
 
       req.method = 'POST';
-      assert.notEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing method changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing method changes the hash');
       req.method = 'GET';
-      assert.equal(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing method back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing method back should generate the same hash');
 
       req.url = 'localhost';
-      assert.notEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing url changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing url changes the hash');
       req.url = 'http://sleepy:3001/';
-      assert.equal(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing url back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing url back should generate the same hash');
 
       req.query = {param1: 1, param2: 2, param3: 'three'};
-      assert.notEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing query string changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing query string changes the hash');
       req.query = {};
-      assert.equal(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing query string back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing query string back should generate the same hash');
 
       req.body = 'Changed';
-      assert.notEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data changes the hash');
+      assert.notStrictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data changes the hash');
       req.body = 'Original';
-      assert.equal(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data back should generate the same hash');
+      assert.strictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data back should generate the same hash');
     });
 
     it('genKeyFromExpressReq - create a unique md5 hash from an express request (IncomingMessage)', () => {
@@ -210,16 +212,16 @@ describe('json-caching-proxy', () => {
 
       mockRes.get = () => 'application/json';
       actualEntry = proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
-      assert.deepEqual(actualEntry, expectedEntry, 'Generate a Valid HAR entry that filters out content-encoding response header');
-      assert.deepEqual(actualEntry.response.content.encoding, 'utf8', 'utf8 encode the response body if the mime type is application/json format');
+      assert.deepStrictEqual(actualEntry, expectedEntry, 'Generate a Valid HAR entry that filters out content-encoding response header');
+      assert.deepStrictEqual(actualEntry.response.content.encoding, 'utf8', 'utf8 encode the response body if the mime type is application/json format');
 
       mockRes.get = () => 'text/plain';
       actualEntry = proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
-      assert.deepEqual(actualEntry.response.content.encoding, 'utf8', 'utf8 encode the response body if the mime type is plain/text format');
+      assert.deepStrictEqual(actualEntry.response.content.encoding, 'utf8', 'utf8 encode the response body if the mime type is plain/text format');
 
       mockRes.get = () => 'obscure_mimetype';
       actualEntry = proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
-      assert.deepEqual(actualEntry.response.content.encoding, 'base64', 'base64 encode the response body if the mimetype is not a text format');
+      assert.deepStrictEqual(actualEntry.response.content.encoding, 'base64', 'base64 encode the response body if the mimetype is not a text format');
     });
 
   });
@@ -258,7 +260,7 @@ describe('json-caching-proxy', () => {
           .then(() => jsonFetch(`${proxyServerUrl}/test`)) // Causes a cache the request
           .then((res) => {
             assert(res.headers.get(mockOptions.proxyHeaderIdentifier), 'Sets the special cache header on responses');
-            assert.equal(proxy.isRouteCacheEmpty(), false, 'Route cache not empty');
+            assert.strictEqual(proxy.isRouteCacheEmpty(), false, 'Route cache not empty');
             assert(proxy.isReplaying(), 'Replay option is enabled');
           })
           .then(() => jsonFetch(`${proxyServerUrl}/${mockOptions.commandPrefix}/playback?enabled=false`))
@@ -275,7 +277,7 @@ describe('json-caching-proxy', () => {
           .then((res) => {
             assert(!res.headers.get(mockOptions.proxyHeaderIdentifier), 'special cache header not sent');
             assert(!proxy.isRecording(), 'Record option is disabled');
-            assert.equal(proxy.isRouteCacheEmpty(), true, 'Route cache empty');
+            assert.strictEqual(proxy.isRouteCacheEmpty(), true, 'Route cache empty');
           });
       });
 
@@ -325,7 +327,7 @@ describe('json-caching-proxy', () => {
             harObject.log.entries[0].request.headers = [];
             harObject.log.entries[0].response.headers = [];
 
-            assert.deepEqual(harObject, expectedHarObject);
+            assert.deepStrictEqual(harObject, expectedHarObject);
           });
       });
 
@@ -334,11 +336,11 @@ describe('json-caching-proxy', () => {
           .then(() => jsonFetch(`${proxyServerUrl}/test`)) // Causes a cache the request
           .then((res) => {
             assert(res.headers.get(mockOptions.proxyHeaderIdentifier), 'Sets the special cache header on responses');
-            assert.equal(proxy.isRouteCacheEmpty(), false, 'Route cache not empty');
+            assert.strictEqual(proxy.isRouteCacheEmpty(), false, 'Route cache not empty');
             assert(proxy.isReplaying(), 'Replay options is enabled');
           })
           .then(() => jsonFetch(`${proxyServerUrl}/${mockOptions.commandPrefix}/clear`))
-          .then(() => assert.equal(proxy.isRouteCacheEmpty(), true, 'Route cache empty'))
+          .then(() => assert.strictEqual(proxy.isRouteCacheEmpty(), true, 'Route cache empty'))
           .then(() => jsonFetch(`${proxyServerUrl}/test`))
           .then((res) => assert(!res.headers.get(mockOptions.proxyHeaderIdentifier), 'special cache header not sent on first get'));
       });
@@ -414,7 +416,7 @@ describe('json-caching-proxy', () => {
           });
   
           proxy.start(() => {
-            assert.equal(proxy.getTotalCachedRoutes(), 2);
+            assert.strictEqual(proxy.getTotalCachedRoutes(), 2);
             proxy.stop();
             done()
           });
@@ -443,28 +445,28 @@ describe('json-caching-proxy', () => {
         it('proxies and caches JSON', () => {
           return jsonFetch(`${proxyServerUrl}/test`)
             .then(res => res.json())
-            .then(json => assert.deepEqual(json, mockJson))
+            .then(json => assert.deepStrictEqual(json, mockJson))
             .then(() => jsonFetch(`${proxyServerUrl}/test`))
             .then(res => res.json())
-            .then(json => assert.deepEqual(json, mockJson))
-            .then(() => assert.equal(proxy.getTotalCachedRoutes(), 1));
+            .then(json => assert.deepStrictEqual(json, mockJson))
+            .then(() => assert.strictEqual(proxy.getTotalCachedRoutes(), 1));
         });
   
         it('excludes routes by regexp', () => {
           return jsonFetch(`${proxyServerUrl}/excluded1`)
             .then(() => jsonFetch(`${proxyServerUrl}/excluded2`))
-            .then(() => assert.equal(proxy.getTotalCachedRoutes(), 0))
+            .then(() => assert.strictEqual(proxy.getTotalCachedRoutes(), 0))
             .then(() => jsonFetch(`${proxyServerUrl}/test`))
-            .then(() => assert.equal(proxy.getTotalCachedRoutes(), 1));
+            .then(() => assert.strictEqual(proxy.getTotalCachedRoutes(), 1));
         });
   
         it('calls user-defined express middleware', () => {
           return jsonFetch(`${proxyServerUrl}/test2`)
             .then(res => res.text())
-            .then(text => assert.equal(text, 'test2'))
+            .then(text => assert.strictEqual(text, 'test2'))
             .then(() => jsonFetch(`${proxyServerUrl}/test3`))
             .then(res => res.text())
-            .then(text => assert.equal(text, 'test3'));
+            .then(text => assert.strictEqual(text, 'test3'));
         });
       });
     });
