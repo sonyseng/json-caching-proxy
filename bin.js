@@ -22,10 +22,10 @@ function isDef (val) {
 program
 	.version(version)
 	.option('-c, --config [path]', 'load a config file of options. Command line args will be overridden')
-	.option('-u, --url [url]', 'remote server (e.g. https://network:8080)')
-	.option('-p, --port [number]', 'port for the local proxy server', parseInt)
+	.option('-u, --url [url]', 'set target server (e.g. https://network:8080)')
+	.option('-p, --port [number]', 'set port for the local proxy server', parseInt)
 	.option('-H, --har [path]', 'load entries from a HAR file and hydrate the cache')
-	.option('-b, --bust [list]', 'a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
+	.option('-b, --bust [list]', 'set cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
 	.option('-e, --exclude [regex]', 'exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
 	.option('-a, --all', 'cache everything from the remote server (Default is to cache just JSON responses)')
 	.option('-P, --disablePlayback', 'disables cache playback')
@@ -34,7 +34,9 @@ program
 	.option('-I, --header [header]', 'change the response header property for identifying cached responses')
 	.option('-l, --log', 'print log output to console')
 	.option('-t, --timeout [number]', 'proxy timeout in milliseconds', parseInt)
-	.option('-d, --deleteCookieDomain', 'Remove the Domain portion of all cookies')
+	.option('-d, --deleteCookieDomain', 'remove the Domain portion of all cookies')
+	.option('-o, --overrideCors [url]', 'override Access-Control-Allow-Origin')
+	.option('-z, --useCorsCredentials', 'set Access-Control-Allow-Credentials to true')
 	.parse(process.argv);
 
 let configOptions = {};
@@ -67,6 +69,12 @@ let dataRecord = isDef(configOptions.dataRecord) ? configOptions.dataRecord : is
 let showConsoleOutput = isDef(configOptions.showConsoleOutput) ? configOptions.showConsoleOutput : isDef(program.log) ? program.log : false;
 let proxyTimeout = configOptions.proxyTimeout ? parseInt(configOptions.proxyTimeout, 10) : program.timeout;
 let deleteCookieDomain = isDef(configOptions.deleteCookieDomain) ? configOptions.deleteCookieDomain : isDef(program.deleteCookieDomain) ? program.deleteCookieDomain : false;
+let overrideCors = isDef(configOptions.overrideCors) ? configOptions.overrideCors : isDef(program.overrideCors) ? program.overrideCors : false;
+let useCorsCredentials = isDef(configOptions.useCorsCredentials) ? configOptions.useCorsCredentials : isDef(program.useCorsCredentials) ? program.useCorsCredentials : false;
+
+if (overrideCors === true) {
+	overrideCors = '*';
+}
 
 let excludedRouteMatchers;
 if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.length > 0) {
@@ -98,7 +106,9 @@ let jsonCachingProxy = new JsonCachingProxy({
 	proxyHeaderIdentifier,
 	showConsoleOutput,
 	proxyTimeout,
-	deleteCookieDomain
+	deleteCookieDomain,
+	overrideCors,
+	useCorsCredentials
 });
 
 jsonCachingProxy.start();

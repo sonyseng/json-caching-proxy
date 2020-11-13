@@ -2,6 +2,7 @@ const npmPackage = require('./package.json');
 const crypto = require('crypto');
 const express = require('express');
 const proxy = require('express-http-proxy');
+const cors = require('cors');
 const bodyParser = require('body-parser');
 const urlUtil = require('url');
 const chalk = require('chalk');
@@ -27,6 +28,8 @@ class JsonCachingProxy {
 			showConsoleOutput: false,
 			proxyTimeout: 3600000, // one hour
 			deleteCookieDomain: false, // Removes the domain portion from all cookies
+			overrideCors: false,
+			useCorsCredentials: false
 		};
 
 		// Ignore undefined values and combine the options with defaults
@@ -44,6 +47,11 @@ class JsonCachingProxy {
 		this.routeCache = {};
 
 		this.excludedParamMap = this.options.cacheBustingParams.reduce((map, param) => { map[param] = true; return map }, {});
+
+		if (this.options.overrideCors) {
+			this.app.use(cors({credentials: this.options.useCorsCredentials, origin: this.options.overrideCors}));
+			this.app.options('*', cors({credentials: this.options.useCorsCredentials, origin: this.options.overrideCors}));
+		}
 
 		if (this.options.showConsoleOutput) {
 			this.log = console.log;
@@ -362,6 +370,10 @@ class JsonCachingProxy {
 					res.location(urlUtil.parse(location).path);
 				}
 
+				if (this.options.overrideCors && this.options.overrideCors !== '*') {
+					res.header('access-control-allow-origin', this.options.overrideCors);
+				}
+
 				if (this.options.deleteCookieDomain && res._headers['set-cookie']) {
 					res.header('set-cookie', this.removeCookiesDomain(res._headers['set-cookie'] || []));
 				}
@@ -398,7 +410,7 @@ class JsonCachingProxy {
 		this.server.setTimeout(this.options.proxyTimeout);
 
 		this.log(chalk.bold(`\JSON Caching Proxy Started:`));
-		this.log(chalk.gray(`==============\n`));
+		this.log(chalk.gray(`===========================\n`));
 		this.log(`Remote server url: \t${chalk.bold(this.options.remoteServerUrl)}`);
 		this.log(`Proxy running on port: \t${chalk.bold(this.options.proxyPort)}`);
 		this.log(`Proxy Timeout: \t\t${chalk.bold(this.options.proxyTimeout)}`);
@@ -408,6 +420,8 @@ class JsonCachingProxy {
 		this.log(`Proxy response header: \t${chalk.bold(this.options.proxyHeaderIdentifier)}`);
 		this.log(`Cache all: \t\t${chalk.bold(this.options.cacheEverything)}`);
 		this.log(`Delete cookies domain: \t${chalk.bold(this.options.deleteCookieDomain)}`);
+		this.log(`Override CORS origin: \t${chalk.bold(this.options.overrideCors)}`);
+		this.log(`Use CORS Credentials: \t${chalk.bold(this.options.useCorsCredentials)}`);
 		this.log(`Cache busting params: \t${chalk.bold(this.options.cacheBustingParams)}`);
 		this.log(`Excluded routes: `);
 		this.options.excludedRouteMatchers.forEach((regExp) => {
