@@ -46,7 +46,7 @@ $ npm install -D json-caching-proxy
 $ json-caching-proxy -u http://remote:8080 -l
 ```
 
-#### Example - Bypassing CORS when proxying to a 3rd party api server
+#### Example - bypassing CORS when proxying to a 3rd party api server
 ```
 $ json-caching-proxy -u http://cors-api.example.com -o localhost:9000 -z
 ```
