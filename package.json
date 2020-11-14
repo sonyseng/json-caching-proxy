@@ -1,12 +1,16 @@
 {
   "name": "json-caching-proxy",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "in-memory reverse caching HAR proxy",
   "keywords": [
     "cache",
     "proxy",
     "json"
   ],
+  "engines": {
+    "node": ">=10.0.0",
+    "npm": ">=6.0.0"
+  },
   "scripts": {
     "test": "mocha ./test/*.spec.js",
     "jsdoc": "jsdoc ./*.js -d ./jsdoc"
