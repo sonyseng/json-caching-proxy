@@ -3,6 +3,8 @@
 Node caching HTTP proxy built on top of [express-http-proxy](https://github.com/villadora/express-http-proxy). Persists requests and responses to an in-memory HAR-like data structure based on [HAR1.2](http://www.softwareishard.com/blog/har-12-spec/) . Caches JSON content-type responses by default with the ability to cache an entire site; including content-types describing images. Useful for testing front end code, mocking api, and saving the cache to a HAR file which can be used for further tests.
 ## Installation
 
+Requires Node >= 10
+
 Command line tool:
 ```
 $ npm install -g json-caching-proxy
