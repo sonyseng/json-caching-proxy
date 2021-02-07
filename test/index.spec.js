@@ -31,6 +31,7 @@ describe('json-caching-proxy', () => {
         {route: '/test3', handle: (req, res, next) => res.send('test3')}
       ],
       excludedRouteMatchers: [new RegExp('excluded1'), new RegExp('excluded2')],
+      excludedStatusMatchers: [new RegExp('503')],
       cacheBustingParams: ['_', 'dc'],
       cacheEverything: false,
       dataPlayback: true,
@@ -239,6 +240,7 @@ describe('json-caching-proxy', () => {
       mockApp.use('/test', (req, res) => res.json(mockJson));
       mockApp.use('/excluded1', (req, res) => res.send(mockText));
       mockApp.use('/excluded2', (req, res) => res.send(mockText));
+      mockApp.use('/excluded503', (req, res) => res.status(503).send(mockJson));
     });
 
     after(done => {
@@ -459,7 +461,15 @@ describe('json-caching-proxy', () => {
             .then(() => jsonFetch(`${proxyServerUrl}/test`))
             .then(() => assert.strictEqual(proxy.getTotalCachedRoutes(), 1));
         });
-  
+
+        it('excludes routes with response status by regexp', () => {
+          return jsonFetch(`${proxyServerUrl}/excluded503`)
+          .then(() => jsonFetch(`${proxyServerUrl}/excluded503`))
+          .then(() => assert.strictEqual(proxy.getTotalCachedRoutes(), 0))
+          .then(() => jsonFetch(`${proxyServerUrl}/test`))
+          .then(() => assert.strictEqual(proxy.getTotalCachedRoutes(), 1));
+        });
+
         it('calls user-defined express middleware', () => {
           return jsonFetch(`${proxyServerUrl}/test2`)
             .then(res => res.text())

@@ -21,6 +21,7 @@ class JsonCachingProxy {
 			proxyHeaderIdentifier: 'caching-proxy-playback',
 			middlewareList: [],
 			excludedRouteMatchers: [],
+			excludedStatusMatchers: [],
 			cacheBustingParams: [],
 			cacheEverything: false,
 			dataPlayback: true,
@@ -187,6 +188,15 @@ class JsonCachingProxy {
 	}
 
 	/**
+	 * Check to see if the status of a response is excluded. It uses the list of regExp matchers to test
+	 * @param {number} status - e.g. 404, 503, etc.
+	 * @returns {boolean} Whether the test is true for some matcher
+	 */
+	isStatusExcluded(status) {
+		return this.options.excludedStatusMatchers.some(regExp => regExp.test(status))
+	}
+
+	/**
 	 * Add express routes for each entry in a harObject. The harObject would have been read in from a har file at some point
 	 * @param {Object} harObject - A standard HAR file object that contains a collection of entries
 	 * @returns {JsonCachingProxy}
@@ -198,6 +208,11 @@ class JsonCachingProxy {
 
 				if (this.isRouteExcluded(entry.request.method, entry.request.url)) {
 					this.log(chalk.red('Excluded from Cache', chalk.bold(entry.request.method, entry.request.url)));
+					return;
+				}
+
+				if (this.isStatusExcluded(entry.response.status)) {
+					this.log(chalk.red('Excluded from Cache', chalk.bold(entry.request.method, entry.request.url, `\tStatus: ${entry.response.status}`)));
 					return;
 				}
 
@@ -380,6 +395,8 @@ class JsonCachingProxy {
 
 				if (this.isRouteExcluded(req.method, req.url)) {
 					this.log(chalk.red('Exclude Proxied Resource', chalk.bold(req.method, req.url)));
+				} else if (this.isStatusExcluded(res.statusCode)) {
+					this.log(chalk.red('Exclude Proxied Resource', chalk.bold(req.method, req.url, `\tStatus: ${res.statusCode}`)));
 				} else {
 					let mimeType = res._headers['content-type'];
 
@@ -425,6 +442,10 @@ class JsonCachingProxy {
 		this.log(`Cache busting params: \t${chalk.bold(this.options.cacheBustingParams)}`);
 		this.log(`Excluded routes: `);
 		this.options.excludedRouteMatchers.forEach((regExp) => {
+			this.log(`\t\t\t${chalk.bold(regExp)}`)
+		});
+		this.log(`Excluded statuses: `);
+		this.options.excludedStatusMatchers.forEach((regExp) => {
 			this.log(`\t\t\t${chalk.bold(regExp)}`)
 		});
 

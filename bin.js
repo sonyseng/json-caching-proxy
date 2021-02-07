@@ -27,6 +27,7 @@ program
 	.option('-H, --har [path]', 'load entries from a HAR file and hydrate the cache')
 	.option('-b, --bust [list]', 'set cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)', list)
 	.option('-e, --exclude [regex]', 'exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")')
+	.option('-S, --excludeStatus [regex]', 'exclude specific status from cache, (e.g. --excludeStatus "503|404")')
 	.option('-a, --all', 'cache everything from the remote server (Default is to cache just JSON responses)')
 	.option('-P, --disablePlayback', 'disables cache playback')
 	.option('-R, --disableRecord', 'disables recording to cache')
@@ -83,6 +84,13 @@ if (configOptions.excludedRouteMatchers && configOptions.excludedRouteMatchers.l
 	excludedRouteMatchers = program.exclude ? [new RegExp(program.exclude)] : [];
 }
 
+let excludedStatusMatchers;
+if (configOptions.excludedStatusMatchers && configOptions.excludedStatusMatchers.length > 0) {
+	excludedStatusMatchers = configOptions.excludedStatusMatchers.map(matcher => new RegExp(matcher));
+} else {
+	excludedStatusMatchers = program.excludeStatus ? [new RegExp(program.excludeStatus)] : [];
+}
+
 let harObject;
 if (inputHarFile) {
 	try {
@@ -100,6 +108,7 @@ let jsonCachingProxy = new JsonCachingProxy({
 	cacheEverything,
 	cacheBustingParams,
 	excludedRouteMatchers,
+	excludedStatusMatchers,
 	dataPlayback,
 	dataRecord,
 	commandPrefix,
