@@ -22,24 +22,25 @@ $ npm install -D json-caching-proxy
 
   Options:
 
-    -h, --help                output usage information
-    -V, --version             output the version number
-    -c, --config [path]       load a config file of options. Command line args will be overridden
-    -u, --url [url]           remote server (e.g. https://network:8080)
-    -p, --port [number]       port for the local proxy server
-    -H, --har [path]          load entries from a HAR file and hydrate the cache
-    -b, --bust [list]         a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)
-    -e, --exclude [regex]     exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")
-    -a, --all                 cache everything from the remote server (Default is to cache just JSON responses)
-    -P, --disablePlayback     disables cache playback
-    -R, --disableRecord       disables recording to cache
-    -C, --cmdPrefix [prefix]  change the prefix for the proxy's web admin endpoints
-    -I, --header [header]     change the response header property for identifying cached responses
-    -l, --log                 print log output to console
-    -t, --timeout             change the timeout for proxy server
-    -d, --deleteCookieDomain  remove the Domain portion of all cookies
-    -o, --overrideCors [url]  override Access-Control-Allow-Origin
-    -z, --useCorsCredentials  set Access-Control-Allow-Credentials to true
+    -h, --help                   output usage information
+    -V, --version                output the version number
+    -c, --config [path]          load a config file of options. Command line args will be overridden
+    -u, --url [url]              remote server (e.g. https://network:8080)
+    -p, --port [number]          port for the local proxy server
+    -H, --har [path]             load entries from a HAR file and hydrate the cache
+    -b, --bust [list]            a list of cache busting query params to ignore. (e.g. --bust _:cacheSlayer:time:dc)
+    -e, --exclude [regex]        exclude specific routes from cache, (e.g. --exclude "GET /api/keep-alive/.*")
+    -S, --excludeStatus [regex]  exclude specific status from cache, (e.g. --excludeStatus "503|404")
+    -a, --all                    cache everything from the remote server (Default is to cache just JSON responses)
+    -P, --disablePlayback        disables cache playback
+    -R, --disableRecord          disables recording to cache
+    -C, --cmdPrefix [prefix]     change the prefix for the proxy's web admin endpoints
+    -I, --header [header]        change the response header property for identifying cached responses
+    -l, --log                    print log output to console
+    -t, --timeout                change the timeout for proxy server
+    -d, --deleteCookieDomain     remove the Domain portion of all cookies
+    -o, --overrideCors [url]     override Access-Control-Allow-Origin
+    -z, --useCorsCredentials     set Access-Control-Allow-Credentials to true
 
 ```
 
@@ -88,6 +89,7 @@ $ json-caching-proxy -u http://remote:8080 -p 3001 -b time:dc -e '/keepalive' -H
   "cacheEverything": true,
   "cacheBustingParams": ["_", "dc", "cacheSlayer"],
   "excludedRouteMatchers": ["/*.js", "/*.png"],
+  "excludedStatusMatchers": ["503", "404"],
   "showConsoleOutput": true,
   "dataPlayback": true,
   "dataRecord": true,
@@ -119,6 +121,7 @@ let jsonCachingProxy = new JsonCachingProxy({
     proxyHeaderIdentifier: 'caching-proxy-playback',
     middlewareList: [{ route: '/browser-sync', handle: (req, res, next) => res.send('bypass proxy')}],
     excludedRouteMatchers: [new RegExp('/site/*.js')],
+    excludedStatusMatchers: [new RegExp('503|404')],
     cacheBustingParams: ['time', 'dc'],
     cacheEverything: false,
     dataPlayback: true,
