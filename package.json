@@ -1,6 +1,6 @@
 {
   "name": "json-caching-proxy",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "in-memory reverse caching HAR proxy",
   "keywords": [
     "cache",
