@@ -107,8 +107,6 @@ $ json-caching-proxy --config config.json
 
 ## Programmatic Usage
 
-API docs can be found here: [JsonCachingProxy doc](http://sonyseng.github.io/json-caching-proxy/jsdoc/JsonCachingProxy.html)
-
 ```js
 const JsonCachingProxy = require('json-caching-proxy');
 
