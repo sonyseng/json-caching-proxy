@@ -20,6 +20,7 @@ function isDef (val) {
 }
 
 program
+	.storeOptionsAsProperties()
 	.version(version)
 	.option('-c, --config [path]', 'load a config file of options. Command line args will be overridden')
 	.option('-u, --url [url]', 'set target server (e.g. https://network:8080)')
