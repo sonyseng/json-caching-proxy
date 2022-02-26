@@ -1,14 +1,18 @@
-const npmPackage = require('./package.json');
-const crypto = require('crypto');
-const express = require('express');
-const proxy = require('express-http-proxy');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-const urlUtil = require('url');
-const chalk = require('chalk');
+import bodyParser from 'body-parser';
+import chalk from 'chalk';
+import cors from 'cors';
+import crypto from 'crypto';
+import express from 'express';
+import fs from 'fs';
+import proxy from 'express-http-proxy';
+import urlUtil from 'url';
+import { promisify } from 'util';
+import zlib from 'zlib';
 
-/** The caching proxy server. */
-class JsonCachingProxy {
+const brotliDecompress = promisify(zlib.brotliDecompress);
+const npmPackage = JSON.parse(fs.readFileSync('package.json'));
+
+export default class JsonCachingProxy {
 	/**
 	 * @param {Object} options - Options passed into the ctor will override defaults if defined
 	 */
@@ -130,10 +134,10 @@ class JsonCachingProxy {
 	 * @param {string} startedDateTime - An ISO Datetime String
 	 * @param {Object} req - An express IncomingMessage request
 	 * @param {Object} res - An express ServerResponse response
-	 * @param {Object} data - An express response body (the content)
+	 * @param {Buffer} data - An express response body (the content buffer)
 	 * @returns {Object} A HAR entry object
 	 */
-	createHarEntry(startedDateTime, req, res, data) {
+	async createHarEntry(startedDateTime, req, res, data) {
 		let reqMimeType = req.get('Content-Type');
 		let resMimeType = res.get('Content-Type') || 'text/plain';
 		let encoding = (/^text\/|^application\/(javascript|json)/).test(resMimeType) ? 'utf8' : 'base64';
@@ -153,11 +157,16 @@ class JsonCachingProxy {
 				status: res.statusCode,
 				statusText: res.statusMessage,
 				cookies: this.convertToNameValueList(res.cookies),
-				headers: this.convertToNameValueList(res._headers).filter(header => header.name.toLowerCase() !== 'content-encoding'), // Not  compressed
+				headers: this.convertToNameValueList(res.getHeaders()).filter(header => header.name.toLowerCase() !== 'content-encoding'), // Not  compressed
 				content: {
 					size: -1,
 					mimeType: resMimeType,
-					text: data.toString(encoding),
+
+					// Workaround for http-express-proxy not handling brotli encoding. TODO: remove this code when HEP fixes this
+					text: (res.getHeaders()['content-encoding'] || '').toLowerCase() == 'br' ?
+						(await brotliDecompress(data)).toString(encoding) :
+						data.toString(encoding),
+
 					encoding: encoding
 				},
 				headersSize: -1,
@@ -301,7 +310,7 @@ class JsonCachingProxy {
 	}
 
 	/**
-	 * Add Request body parsing into RAW if there is actual body content
+	 * Add Request body parsing into bodyParser if there is actual body content
 	 * @returns {JsonCachingProxy}
 	 */
 	addBodyParser() {
@@ -376,9 +385,11 @@ class JsonCachingProxy {
 	 * Modifies locations on redirects.
 	 * @returns {JsonCachingProxy}
 	 */
-	addProxyRoute() {
+	async addProxyRoute() {
 		this.app.use('/', proxy(this.options.remoteServerUrl, {
-			userResDecorator: (rsp, rspData, req, res) => {
+			userResDecorator: async (rsp, rspData, req, res) => {
+				let headers = res.getHeaders();
+
 				// Handle Redirects by modifying the location property of the response header
 				let location = res.get('location');
 				if (location) {
@@ -389,8 +400,8 @@ class JsonCachingProxy {
 					res.header('access-control-allow-origin', this.options.overrideCors);
 				}
 
-				if (this.options.deleteCookieDomain && res._headers['set-cookie']) {
-					res.header('set-cookie', this.removeCookiesDomain(res._headers['set-cookie'] || []));
+				if (this.options.deleteCookieDomain && headers['set-cookie']) {
+					res.header('set-cookie', this.removeCookiesDomain(headers['set-cookie'] || []));
 				}
 
 				if (this.isRouteExcluded(req.method, req.url)) {
@@ -398,11 +409,12 @@ class JsonCachingProxy {
 				} else if (this.isStatusExcluded(res.statusCode)) {
 					this.log(chalk.red('Exclude Proxied Resource', chalk.bold(req.method, req.url, `\tStatus: ${res.statusCode}`)));
 				} else {
-					let mimeType = res._headers['content-type'];
+					let mimeType = headers['content-type'];
 
 					if (this.options.dataRecord && (this.options.cacheEverything || !this.options.cacheEverything && mimeType && mimeType.indexOf('application/json') >= 0)) {
 						let { key, hash } = this.genKeyFromExpressReq(req);
-						let entry = this.createHarEntry(new Date().toISOString(), req, res, rspData);
+						let entry = await this.createHarEntry(new Date().toISOString(), req, res, rspData);
+
 						this.routeCache[key] = entry;
 						this.log(chalk.yellow('Saved to Cache', hash, chalk.bold(entry.request.method, entry.request.url)));
 					} else {
@@ -532,5 +544,3 @@ class JsonCachingProxy {
 	 */
 	isRecording() { return this.options.dataRecord; }
 }
-
-module.exports = JsonCachingProxy;

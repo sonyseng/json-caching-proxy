@@ -1,14 +1,15 @@
 {
   "name": "json-caching-proxy",
-  "version": "1.6.1",
+  "version": "2.0.0",
   "description": "in-memory reverse caching HAR proxy",
   "keywords": [
     "cache",
     "proxy",
     "json"
   ],
+  "type": "module",
   "engines": {
-    "node": ">=10.0.0",
+    "node": ">=14.0.0",
     "npm": ">=6.0.0"
   },
   "scripts": {
@@ -23,16 +24,16 @@
   "main": "index.js",
   "bin": "bin.js",
   "dependencies": {
-    "body-parser": "^1.17.2",
-    "chalk": "^4.1.0",
-    "commander": "^7.2.0",
+    "body-parser": "^1.19.2",
+    "chalk": "^5.0.0",
+    "commander": "^9.0.0",
     "cors": "^2.8.5",
-    "express": "^4.14.1",
-    "express-http-proxy": "^1.6.2",
-    "strip-json-comments": "^3.1.1"
+    "express": "^4.17.3",
+    "express-http-proxy": "^1.6.3",
+    "strip-json-comments": "^4.0.0"
   },
   "devDependencies": {
-    "mocha": "^8.4.0",
-    "node-fetch": "^2.6.1"
+    "mocha": "^9.2.1",
+    "node-fetch": "^3.2.0"
   }
 }
