@@ -1,14 +1,14 @@
 #!/usr/bin/env node
 
-const version = require('./package.json').version;
-const JsonCachingProxy = require('./');
+import { program } from "commander";
+import fs from "fs";
+import path from "path";
+import stripJsonComments from "strip-json-comments";
 
-const fs = require('fs');
-const url = require('url');
-const path = require('path');
-const program = require('commander');
-const stripJsonComments = require('strip-json-comments');
+import JsonCachingProxy from "./index.js";
 
+const npmPackage = JSON.parse(fs.readFileSync('./package.json'));
+const version = npmPackage.version;
 const cwd = process.cwd();
 
 function list (val) {

@@ -1,9 +1,10 @@
-# json-caching-proxy [![Build Status](https://travis-ci.org/sonyseng/json-caching-proxy.svg?branch=master)](https://travis-ci.org/sonyseng/json-caching-proxy) [![NPM Version](http://img.shields.io/npm/v/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy) [![NPM Downloads](https://img.shields.io/npm/dm/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy)
+# json-caching-proxy ![Build Status](https://github.com/sonyseng/json-caching-proxy/actions/workflows/node.js.yml/badge.svg) [![NPM Version](http://img.shields.io/npm/v/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy) [![NPM Downloads](https://img.shields.io/npm/dm/json-caching-proxy.svg?style=flat)](https://www.npmjs.org/package/json-caching-proxy)
 
 Node caching HTTP proxy built on top of [express-http-proxy](https://github.com/villadora/express-http-proxy). Persists requests and responses to an in-memory HAR-like data structure based on [HAR1.2](http://www.softwareishard.com/blog/har-12-spec/) . Caches JSON content-type responses by default with the ability to cache an entire site; including content-types describing images. Useful for testing front end code, mocking api, and saving the cache to a HAR file which can be used for further tests.
+
 ## Installation
 
-Requires Node >= 10
+Requires Node >= 14
 
 Command line tool:
 ```
@@ -226,7 +227,7 @@ cacheBustingParams: ['time', 'dc', 'cacheSlayer', '_']
 ```
 
 ## Controlling the Proxy
-Once the proxy has started, you may point your browser to the following urls to affect the state of the proxy:
+Once the proxy has started on a port (e.g. 3001), you may point your browser to the following urls to affect the state of the proxy:
 ```
 http://localhost:3001/proxy/playback?enabled=[true|false] - Start/Stop replaying cached requests.
 http://localhost:3001/proxy/record?enabled=[true|false] - Start/Stop recording request/responses to the cache.

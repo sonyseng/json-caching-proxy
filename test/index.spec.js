@@ -1,11 +1,12 @@
-const util = require('util');
-const assert = require('assert');
-const fetch = require('node-fetch');
-const express = require('express');
+import assert from 'assert';
+import express from 'express';
+import fs from "fs";
+import fetch from 'node-fetch';
+import zlib from "zlib";
 
-const npmPackage = require('./../package.json');
-const JsonCachingProxy = require('./../index');
+import JsonCachingProxy from '../index.js';
 
+const npmPackage = JSON.parse(fs.readFileSync('./package.json'));
 const mockServerPort = 8118;
 const proxyPort = 8119;
 const proxyServerUrl = 'http://localhost:'+ proxyPort;
@@ -67,7 +68,7 @@ describe('json-caching-proxy', () => {
     });
   });
 
-  describe('Utility methods', () => {
+  describe('Utility methods',() => {
     proxy = new JsonCachingProxy();
 
     it('removeCookiesDomain - Removes the domain attr from cookie headers', () => {
@@ -89,7 +90,7 @@ describe('json-caching-proxy', () => {
       assert.deepStrictEqual(nameValues, [{name:'one', value:1}, {name: 'two', value: 2}, {name: 'three', value: 3}]);
     });
 
-    it('genKeyFromHarReq - create a unique md5 hash from a har entry request  method/url/querystring/postdata', () => {
+    it('genKeyFromHarReq - create a unique md5 hash from a har entry GET request method/url/querystring/postdata', () => {
       let harEntryRequest = {
         method: 'GET',
         url: 'http://sleepy:3001/',
@@ -133,7 +134,7 @@ describe('json-caching-proxy', () => {
       assert.strictEqual(proxy.genKeyFromHarReq(harEntryRequest).hash, keyHash.hash, 'Changing post data back should generate the same hash');
     });
 
-    it('genKeyFromExpressReq - create a unique md5 hash from an express request (IncomingMessage)', () => {
+    it('genKeyFromExpressReq - create a unique md5 hash from a basic express request (IncomingMessage)', () => {
       let req = {
         query: {},
         method: 'GET',
@@ -164,7 +165,7 @@ describe('json-caching-proxy', () => {
       assert.strictEqual(proxy.genKeyFromExpressReq(req).hash, keyHash.hash, 'Changing post data back should generate the same hash');
     });
 
-    it('genKeyFromExpressReq - create a unique md5 hash from an express request (IncomingMessage)', () => {
+    it('genKeyFromExpressReq - create a unique md5 hash from a complex express request with data, cookies, and headers (IncomingMessage)', async () => {
       let actualEntry = null;
       let expectedEntry = {
         request: {
@@ -208,23 +209,27 @@ describe('json-caching-proxy', () => {
         statusCode: 200,
         statusMessage: 'OK',
         cookies: {cookie1: 1, cookie2: 2, cookie3: 'three'},
-        _headers: {header1: 1, header2: 2, header3: 'three', 'content-encoding': 'gzip'}
+        getHeaders: () => ({header1: 1, header2: 2, header3: 'three', 'content-encoding': 'gzip'})
       };
 
       mockRes.get = () => 'application/json';
-      actualEntry = proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
+      actualEntry = await proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
       assert.deepStrictEqual(actualEntry, expectedEntry, 'Generate a Valid HAR entry that filters out content-encoding response header');
       assert.deepStrictEqual(actualEntry.response.content.encoding, 'utf8', 'utf8 encode the response body if the mime type is application/json format');
 
       mockRes.get = () => 'text/plain';
-      actualEntry = proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
+      actualEntry = await proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
       assert.deepStrictEqual(actualEntry.response.content.encoding, 'utf8', 'utf8 encode the response body if the mime type is plain/text format');
 
       mockRes.get = () => 'obscure_mimetype';
-      actualEntry = proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
+      actualEntry = await proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, '{"Response": 42}');
       assert.deepStrictEqual(actualEntry.response.content.encoding, 'base64', 'base64 encode the response body if the mimetype is not a text format');
-    });
 
+      mockRes.get = () => 'text/plain';
+      mockRes.getHeaders = () => ({'content-encoding': 'br'});
+      actualEntry = await proxy.createHarEntry(new Date('2017-07-25T21:03:55.962Z').toISOString(), mockReq, mockRes, zlib.brotliCompressSync('hello there!'));
+      assert.deepStrictEqual(actualEntry.response.content.text, 'hello there!','utf8 encode the response body with brotli compression');
+    });
   });
 
   describe('Express Routes', () => {
@@ -283,7 +288,7 @@ describe('json-caching-proxy', () => {
           });
       });
 
-      it('generates a har response. TODO: Validate against HAR 1.2 schema', () => {
+      it('generates a har response', () => {
         let expectedHarObject = {
           log: {
             version: '1.2',
