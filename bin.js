@@ -5,9 +5,12 @@ import fs from "fs";
 import path from "path";
 import stripJsonComments from "strip-json-comments";
 
-import JsonCachingProxy from "./index.js";
+import JsonCachingProxy from "./index.mjs";
+import urlUtil from "url";
 
-const npmPackage = JSON.parse(fs.readFileSync('./package.json'));
+const __filename = urlUtil.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const npmPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname,'package.json')));
 const version = npmPackage.version;
 const cwd = process.cwd();
 

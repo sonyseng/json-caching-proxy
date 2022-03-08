@@ -3,14 +3,18 @@ import chalk from 'chalk';
 import cors from 'cors';
 import crypto from 'crypto';
 import express from 'express';
-import fs from 'fs';
 import proxy from 'express-http-proxy';
-import urlUtil from 'url';
+import fs from 'fs';
+import path from "path";
 import { promisify } from 'util';
+import urlUtil from 'url';
 import zlib from 'zlib';
 
+const __filename = urlUtil.fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 const brotliDecompress = promisify(zlib.brotliDecompress);
-const npmPackage = JSON.parse(fs.readFileSync('package.json'));
+
+const npmPackage = JSON.parse(fs.readFileSync(path.resolve(__dirname,'package.json')));
 
 export default class JsonCachingProxy {
 	/**

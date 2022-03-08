@@ -109,7 +109,7 @@ $ json-caching-proxy --config config.json
 ## Programmatic Usage
 
 ```js
-const JsonCachingProxy = require('json-caching-proxy');
+import JsonCachingProxy from 'json-caching-proxy';
 
 // Complete list of options
 let jsonCachingProxy = new JsonCachingProxy({
