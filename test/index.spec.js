@@ -4,7 +4,7 @@ import fs from "fs";
 import fetch from 'node-fetch';
 import zlib from "zlib";
 
-import JsonCachingProxy from '../index.js';
+import JsonCachingProxy from '../index.mjs';
 
 const npmPackage = JSON.parse(fs.readFileSync('./package.json'));
 const mockServerPort = 8118;
