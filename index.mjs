@@ -9,6 +9,7 @@ import path from "path";
 import { promisify } from 'util';
 import urlUtil from 'url';
 import zlib from 'zlib';
+import { hasUncaughtExceptionCaptureCallback } from 'process';
 
 const __filename = urlUtil.fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -38,7 +39,8 @@ export default class JsonCachingProxy {
 			proxyTimeout: 3600000, // one hour
 			deleteCookieDomain: false, // Removes the domain portion from all cookies
 			overrideCors: false,
-			useCorsCredentials: false
+			useCorsCredentials: false,
+			rejectNonCachedRequests: false
 		};
 
 		// Ignore undefined values and combine the options with defaults
@@ -473,6 +475,12 @@ export default class JsonCachingProxy {
 		this.addMiddleWareRoutes(this.options.middlewareList);
 		this.addBodyParser();
 		this.addCachingRoute();
+		if (this.options.rejectNonCachedRequests) {
+			this.app.get("*", function (req, res) {
+				throw new Error("Request not recorded: " + req.originalUrl)
+			});
+		}
+
 		this.addProxyRoute();
 
 		onStarted && onStarted();

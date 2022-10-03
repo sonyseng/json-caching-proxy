@@ -42,6 +42,7 @@ program
 	.option('-d, --deleteCookieDomain', 'remove the Domain portion of all cookies')
 	.option('-o, --overrideCors [url]', 'override Access-Control-Allow-Origin')
 	.option('-z, --useCorsCredentials', 'set Access-Control-Allow-Credentials to true')
+	.option('-x, --rejectNonCachedRequests', 'In playback mode, reject request not in cache')
 	.parse(process.argv);
 
 let configOptions = {};
@@ -76,6 +77,7 @@ let proxyTimeout = configOptions.proxyTimeout ? parseInt(configOptions.proxyTime
 let deleteCookieDomain = isDef(configOptions.deleteCookieDomain) ? configOptions.deleteCookieDomain : isDef(program.deleteCookieDomain) ? program.deleteCookieDomain : false;
 let overrideCors = isDef(configOptions.overrideCors) ? configOptions.overrideCors : isDef(program.overrideCors) ? program.overrideCors : false;
 let useCorsCredentials = isDef(configOptions.useCorsCredentials) ? configOptions.useCorsCredentials : isDef(program.useCorsCredentials) ? program.useCorsCredentials : false;
+let rejectNonCachedRequests = isDef(configOptions.rejectNonCachedRequests) ? configOptions.rejectNonCachedRequests : isDef(program.rejectNonCachedRequests) ? program.rejectNonCachedRequests : false;
 
 if (overrideCors === true) {
 	overrideCors = '*';
@@ -121,7 +123,8 @@ let jsonCachingProxy = new JsonCachingProxy({
 	proxyTimeout,
 	deleteCookieDomain,
 	overrideCors,
-	useCorsCredentials
+	useCorsCredentials,
+	rejectNonCachedRequests
 });
 
 jsonCachingProxy.start();
